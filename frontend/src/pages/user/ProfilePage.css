@@ -1,0 +1,105 @@
+.profile-page {
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.profile-header {
+    margin-bottom: var(--space-6);
+}
+
+.profile-header h1 {
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
+}
+
+.profile-header p {
+    color: var(--text-secondary);
+}
+
+.profile-card {
+    padding: var(--space-8);
+}
+
+.profile-avatar-section {
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+}
+
+.profile-avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: var(--radius-full);
+    background: var(--gradient-primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-glow);
+}
+
+.profile-avatar-section h2 {
+    font-size: var(--text-xl);
+    font-weight: 600;
+    margin-bottom: var(--space-2);
+    word-break: break-all;
+}
+
+.profile-divider {
+    height: 1px;
+    background: var(--border-primary);
+    margin: var(--space-6) 0;
+}
+
+.profile-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--space-4);
+}
+
+.profile-info-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast);
+}
+
+.profile-info-item:hover {
+    background: var(--bg-hover);
+}
+
+.profile-info-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: var(--primary-500);
+    background: var(--bg-active);
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+}
+
+.profile-info-label {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    margin-bottom: var(--space-1);
+}
+
+.profile-info-value {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-primary);
+}

@@ -1,26 +1,75 @@
-# Models folder (too large)
+# ═══════════════════════════════════════════════
+#  AI Sentiment Analysis — .gitignore
+#  DH23TIN05 — Phạm Minh Kha
+# ═══════════════════════════════════════════════
+
+# ── AI Models (quá nặng để push lên GitHub) ──
 models/
 
-# Python cache
+# ── Backend: Môi trường ảo Python ─────────────
+venv/
+env/
+ENV/
+.venv/
+backend/.venv/
+
+# ── Backend: Biến môi trường (chứa SECRET KEY, Database password) ──
+.env
+.env.*
+!.env.example
+backend/.env
+
+# ── Frontend: Thư viện Node.js (cực nặng ~300MB+) ──
+node_modules/
+frontend/node_modules/
+
+# ── Frontend: Code đã build (tự sinh ra, không cần push) ──
+dist/
+dist-ssr/
+frontend/dist/
+
+# ── Frontend: File cấu hình local ──
+*.local
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# ── Python: Cache và byte-code ────────────────
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.pyo
+*.pyd
 
-# Virtual environments
-venv/
-env/
-ENV/
+# ── Jupyter Notebook checkpoints ──────────────
+.ipynb_checkpoints/
 
-# IDE
+# ── IDE / Code Editor ─────────────────────────
 .vscode/
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 
-# OS
+# ── Hệ điều hành ──────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Jupyter Notebook
-.ipynb_checkpoints/
+# ── Log files ─────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Debug scripts tạm thời ────────────────────
+backend/debug_*.py
+backend/fix_*.py
+backend/test_*.py

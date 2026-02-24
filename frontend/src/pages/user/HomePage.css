@@ -1,0 +1,205 @@
+/* ═══════════════════════════════════════════════════
+   Home Page styles
+   ═══════════════════════════════════════════════════ */
+
+.home-page {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.home-header {
+    margin-bottom: var(--space-8);
+}
+
+.home-header h1 {
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
+}
+
+.home-header-icon {
+    color: var(--primary-500);
+}
+
+.home-header p {
+    color: var(--text-secondary);
+    font-size: var(--text-base);
+}
+
+/* ── Input Section ─────────────────────────────── */
+.home-input-section {
+    padding: var(--space-6);
+}
+
+.home-input-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-4);
+}
+
+.home-input-header h2 {
+    font-size: var(--text-lg);
+    font-weight: 600;
+}
+
+.home-char-count {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+}
+
+.home-textarea {
+    min-height: 180px;
+    font-size: var(--text-base);
+    line-height: 1.8;
+    resize: vertical;
+}
+
+.home-input-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+}
+
+/* ── Result ────────────────────────────────────── */
+.home-result {
+    margin-top: var(--space-6);
+}
+
+.home-result-card {
+    padding: var(--space-8);
+    position: relative;
+    overflow: hidden;
+}
+
+.home-result-emoji {
+    font-size: 48px;
+    text-align: center;
+    margin-bottom: var(--space-4);
+    animation: float 2.5s ease-in-out infinite;
+}
+
+.home-result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-6);
+}
+
+.home-result-header .badge {
+    font-size: var(--text-sm);
+    padding: var(--space-2) var(--space-4);
+}
+
+.home-result-model {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+}
+
+/* Confidence bar */
+.home-result-confidence {
+    margin-bottom: var(--space-6);
+}
+
+.home-confidence-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.home-confidence-value {
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+}
+
+.home-confidence-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-surface-2);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.home-confidence-fill {
+    height: 100%;
+    border-radius: var(--radius-full);
+    transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.home-confidence-positive {
+    background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.home-confidence-negative {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+.home-confidence-neutral {
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+/* Result text */
+.home-result-text {
+    background: var(--bg-surface-2);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.home-result-text h4 {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-tertiary);
+    margin-bottom: var(--space-2);
+}
+
+.home-result-text p {
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    line-height: 1.7;
+}
+
+/* Meta */
+.home-result-meta {
+    display: flex;
+    gap: var(--space-4);
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+}
+
+/* Color borders */
+.home-result-positive {
+    border-left: 3px solid var(--positive);
+}
+
+.home-result-negative {
+    border-left: 3px solid var(--negative);
+}
+
+.home-result-neutral {
+    border-left: 3px solid var(--neutral);
+}
+
+@media (max-width: 768px) {
+    .home-input-actions {
+        flex-direction: column;
+    }
+
+    .home-input-actions .btn {
+        width: 100%;
+    }
+}
