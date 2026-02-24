@@ -94,6 +94,24 @@ class LoginRequest(BaseModel):
         return self
 
 
+class ForgotPasswordRequest(BaseModel):
+    """Gửi mã xác thực qua email."""
+    email: EmailStr
+
+
+class VerifyResetCodeRequest(BaseModel):
+    """Xác thực mã reset."""
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+class ResetPasswordRequest(BaseModel):
+    """Đặt lại mật khẩu."""
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
 class TokenResponse(BaseModel):
     """JWT token trả về sau khi đăng nhập."""
     access_token: str
@@ -112,6 +130,35 @@ class UserProfile(BaseModel):
     tk_taoluc: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ══════════════════════════════════════════════════════════
+# ADMIN USER MANAGEMENT Schemas
+# ══════════════════════════════════════════════════════════
+
+class AdminUserItem(BaseModel):
+    """Thông tin user cho admin list."""
+    tk_id: int
+    tk_email: Optional[str] = None
+    tk_sdt: Optional[str] = None
+    tk_vaitro: VaiTroEnum
+    tk_dangnhap: DangNhapEnum
+    tk_xoa: bool = False
+    tk_taoluc: Optional[datetime] = None
+    tk_loginluc: Optional[datetime] = None
+    tong_vanban: int = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UpdateRoleRequest(BaseModel):
+    """Đổi vai trò người dùng."""
+    vaitro: VaiTroEnum
+
+
+class UpdateUserStatusRequest(BaseModel):
+    """Khóa / mở khóa tài khoản."""
+    xoa: bool  # True = khóa, False = mở khóa
 
 
 # ══════════════════════════════════════════════════════════

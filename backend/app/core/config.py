@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
 
+    # ── SMTP Email (for password reset) ───────────────────
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_NAME: str = "SentimentAI"
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

@@ -71,8 +71,16 @@
     color: var(--primary-500);
 }
 
-.collapsed .sidebar-collapse-btn {
+.collapsed .sidebar-logo {
     display: none;
+}
+
+.collapsed .sidebar-header {
+    justify-content: center;
+}
+
+.collapsed .sidebar-collapse-btn {
+    display: flex;
 }
 
 /* ── Nav ────────────────────────────────────────── */

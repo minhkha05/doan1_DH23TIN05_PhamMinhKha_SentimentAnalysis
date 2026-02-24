@@ -1,15 +1,18 @@
 /* ═══════════════════════════════════════════════════
-   Admin Test Model Page – quick analysis test
+   Admin Test Model Page – Select & test AI models
    ═══════════════════════════════════════════════════ */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     HiOutlineBeaker,
     HiOutlinePaperAirplane,
     HiOutlineArrowPath,
+    HiOutlineCpuChip,
+    HiOutlineCheckCircle,
+    HiOutlineStar,
 } from 'react-icons/hi2';
-import { userService } from '../../services/userService';
-import type { KetQuaResponse, CamXuc } from '../../types';
+import { adminService, type ModelInfo } from '../../services/adminService';
+import type { CamXuc } from '../../types';
 import toast from 'react-hot-toast';
 import './AdminPages.css';
 
@@ -27,41 +30,149 @@ const sampleTexts = [
     'Thất vọng hoàn toàn, sản phẩm không như mô tả, lừa đảo.',
 ];
 
+interface TestResult {
+    camxuc: CamXuc;
+    tincay: number;
+    noidung: string;
+    model: string;
+}
+
 const TestModelPage: React.FC = () => {
     const [text, setText] = useState('');
     const [loading, setLoading] = useState(false);
-    const [results, setResults] = useState<KetQuaResponse[]>([]);
+    const [results, setResults] = useState<TestResult[]>([]);
+
+    // Model state
+    const [models, setModels] = useState<ModelInfo[]>([]);
+    const [activeModel, setActiveModel] = useState<string | null>(null);
+    const [selectedModel, setSelectedModel] = useState<string>('');
+    const [loadingModels, setLoadingModels] = useState(true);
+    const [settingActive, setSettingActive] = useState(false);
+
+    // Confirm dialog
+    const [showConfirm, setShowConfirm] = useState(false);
+
+    useEffect(() => {
+        fetchModels();
+    }, []);
+
+    const fetchModels = async () => {
+        setLoadingModels(true);
+        try {
+            const res = await adminService.getModels();
+            setModels(res.models);
+            setActiveModel(res.active_model);
+            if (res.models.length > 0) {
+                setSelectedModel(res.active_model || res.models[0].name);
+            }
+        } catch {
+            toast.error('Không thể tải danh sách mô hình.');
+        } finally {
+            setLoadingModels(false);
+        }
+    };
 
     const handleTest = async () => {
         if (!text.trim()) {
             toast.error('Vui lòng nhập văn bản.');
             return;
         }
+        if (!selectedModel) {
+            toast.error('Vui lòng chọn mô hình.');
+            return;
+        }
         setLoading(true);
         try {
-            const res = await userService.analyzeText({ noidung: text.trim() });
-            setResults((prev) => [res.data, ...prev]);
+            const res = await adminService.testModel(text.trim(), selectedModel);
+            setResults((prev) => [res, ...prev]);
             setText('');
             toast.success('Test hoàn tất!');
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Có lỗi xảy ra.');
+            toast.error(err.response?.data?.detail || 'Có lỗi xảy ra khi test model.');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSample = (sample: string) => {
-        setText(sample);
+    const handleSetActive = async () => {
+        setSettingActive(true);
+        try {
+            await adminService.setActiveModel(selectedModel);
+            setActiveModel(selectedModel);
+            setShowConfirm(false);
+            toast.success(`Đã đặt "${selectedModel}" làm mô hình mặc định!`);
+        } catch (err: any) {
+            toast.error(err.response?.data?.detail || 'Không thể cập nhật mô hình mặc định.');
+        } finally {
+            setSettingActive(false);
+        }
     };
+
+
 
     return (
         <div className="admin-page">
             <div className="admin-page-header animate-fade-in-down">
                 <h1><HiOutlineBeaker /> Test Model</h1>
-                <p>Kiểm tra nhanh mô hình phân tích cảm xúc</p>
+                <p>Chọn mô hình AI, kiểm tra hiệu quả và đặt mô hình mặc định cho hệ thống</p>
             </div>
 
-            <div className="test-input-card glass-card-static animate-fade-in-up stagger-1">
+            {/* ── Model Selector ─────────────────── */}
+            <div className="model-selector glass-card-static animate-fade-in-up stagger-1">
+                <div className="model-selector-header">
+                    <HiOutlineCpuChip size={20} />
+                    <h3>Chọn mô hình AI</h3>
+                </div>
+
+                {loadingModels ? (
+                    <div className="model-selector-loading"><div className="spinner" /></div>
+                ) : models.length === 0 ? (
+                    <div className="model-selector-empty">
+                        <p>Chưa có mô hình nào trong thư mục <code>/models</code>.</p>
+                        <p>Hãy fine-tune PhoBERT và đặt model vào thư mục models.</p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="model-selector-row">
+                            <select
+                                className="input model-dropdown"
+                                value={selectedModel}
+                                onChange={(e) => setSelectedModel(e.target.value)}
+                            >
+                                {models.map((m) => (
+                                    <option key={m.name} value={m.name} className="model-dropdown-option">
+                                        {m.name}{m.name === activeModel ? ' ⭐ (mặc định)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <button
+                                className={`btn ${selectedModel === activeModel ? 'btn-ghost' : 'btn-primary'} model-set-default-btn`}
+                                disabled={selectedModel === activeModel || !selectedModel}
+                                onClick={() => setShowConfirm(true)}
+                            >
+                                {selectedModel === activeModel ? (
+                                    <><HiOutlineCheckCircle size={16} /> Đang mặc định</>
+                                ) : (
+                                    <><HiOutlineStar size={16} /> Đặt mặc định</>
+                                )}
+                            </button>
+                        </div>
+
+
+
+                        {activeModel && (
+                            <div className="model-active-badge">
+                                <HiOutlineCheckCircle size={14} />
+                                Mô hình mặc định hiện tại: <strong>{activeModel}</strong>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
+            {/* ── Test Input ─────────────────────── */}
+            <div className="test-input-card glass-card-static animate-fade-in-up stagger-2">
                 <textarea
                     className="input textarea"
                     placeholder="Nhập văn bản để test..."
@@ -73,9 +184,13 @@ const TestModelPage: React.FC = () => {
                     <button className="btn btn-ghost btn-sm" onClick={() => { setText(''); setResults([]); }}>
                         <HiOutlineArrowPath /> Reset
                     </button>
-                    <button className="btn btn-primary" onClick={handleTest} disabled={loading || !text.trim()}>
+                    <button
+                        className="btn btn-primary"
+                        onClick={handleTest}
+                        disabled={loading || !text.trim() || !selectedModel}
+                    >
                         {loading ? <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> : <HiOutlinePaperAirplane />}
-                        Test
+                        Test mô hình này
                     </button>
                 </div>
 
@@ -83,7 +198,7 @@ const TestModelPage: React.FC = () => {
                     <span className="test-samples-label">Mẫu thử:</span>
                     <div className="test-samples-list">
                         {sampleTexts.map((s, i) => (
-                            <button key={i} className="btn btn-ghost btn-sm test-sample-btn" onClick={() => handleSample(s)}>
+                            <button key={i} className="btn btn-ghost btn-sm test-sample-btn" onClick={() => setText(s)}>
                                 {s.slice(0, 40)}...
                             </button>
                         ))}
@@ -91,8 +206,9 @@ const TestModelPage: React.FC = () => {
                 </div>
             </div>
 
+            {/* ── Results ────────────────────────── */}
             {results.length > 0 && (
-                <div className="test-results animate-fade-in-up stagger-2">
+                <div className="test-results animate-fade-in-up stagger-3">
                     <h3>Kết quả ({results.length})</h3>
                     <div className="test-results-list">
                         {results.map((r, i) => {
@@ -109,6 +225,27 @@ const TestModelPage: React.FC = () => {
                                 </div>
                             );
                         })}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Confirm Set Active Dialog ──────── */}
+            {showConfirm && (
+                <div className="confirm-overlay" onClick={() => setShowConfirm(false)}>
+                    <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+                        <h3>Đặt mô hình mặc định</h3>
+                        <p>
+                            Bạn có chắc muốn đặt <strong>"{selectedModel}"</strong> làm mô hình
+                            mặc định cho tất cả người dùng phân tích cảm xúc?
+                        </p>
+                        <div className="confirm-actions">
+                            <button className="btn btn-ghost" onClick={() => setShowConfirm(false)}>
+                                Hủy
+                            </button>
+                            <button className="btn btn-primary" onClick={handleSetActive} disabled={settingActive}>
+                                {settingActive ? <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> : 'Xác nhận'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
