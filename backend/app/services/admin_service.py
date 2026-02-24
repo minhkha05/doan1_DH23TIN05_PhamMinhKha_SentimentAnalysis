@@ -102,6 +102,122 @@ class AdminService:
         }
 
     # ══════════════════════════════════════════════════════
+    # User Management
+    # ══════════════════════════════════════════════════════
+
+    async def list_users(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        search: str | None = None,
+        role: str | None = None,
+        status: str | None = None,
+    ) -> Tuple[List[dict], int]:
+        """List all users with search, filter, pagination."""
+        from sqlalchemy import or_
+
+        # Base condition
+        conditions = []
+        if search:
+            search_like = f"%{search}%"
+            conditions.append(
+                or_(
+                    TaiKhoan.tk_email.ilike(search_like),
+                    TaiKhoan.tk_sdt.ilike(search_like),
+                )
+            )
+        if role and role in ("user", "admin"):
+            from app.models.models import VaiTro as VaiTroModel
+            conditions.append(TaiKhoan.tk_vaitro == VaiTroModel(role))
+        if status == "active":
+            conditions.append(TaiKhoan.tk_xoa == False)  # noqa: E712
+        elif status == "locked":
+            conditions.append(TaiKhoan.tk_xoa == True)  # noqa: E712
+
+        # Count
+        count_stmt = select(func.count()).select_from(TaiKhoan)
+        for c in conditions:
+            count_stmt = count_stmt.where(c)
+        total = (await self.db.execute(count_stmt)).scalar() or 0
+
+        # Query with text count subquery
+        vb_count_subq = (
+            select(
+                VanBan.vb_tk_id,
+                func.count().label("tong_vanban"),
+            )
+            .where(VanBan.vb_xoa == False)  # noqa: E712
+            .group_by(VanBan.vb_tk_id)
+            .subquery("vb_count")
+        )
+
+        stmt = (
+            select(
+                TaiKhoan,
+                func.coalesce(vb_count_subq.c.tong_vanban, 0).label("tong_vanban"),
+            )
+            .outerjoin(vb_count_subq, TaiKhoan.tk_id == vb_count_subq.c.vb_tk_id)
+        )
+        for c in conditions:
+            stmt = stmt.where(c)
+        stmt = stmt.order_by(TaiKhoan.tk_id.desc())
+
+        offset = (page - 1) * page_size
+        stmt = stmt.offset(offset).limit(page_size)
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        users = []
+        for row in rows:
+            user = row[0]  # TaiKhoan object
+            tong_vb = row[1]  # count
+            users.append({
+                "tk_id": user.tk_id,
+                "tk_email": user.tk_email,
+                "tk_sdt": user.tk_sdt,
+                "tk_vaitro": user.tk_vaitro,
+                "tk_dangnhap": user.tk_dangnhap,
+                "tk_xoa": user.tk_xoa,
+                "tk_taoluc": user.tk_taoluc,
+                "tk_loginluc": user.tk_loginluc,
+                "tong_vanban": tong_vb,
+            })
+
+        return users, total
+
+    async def update_user_role(self, user_id: int, new_role: str) -> dict:
+        """Change user role."""
+        from app.models.models import VaiTro as VaiTroModel
+        stmt = select(TaiKhoan).where(TaiKhoan.tk_id == user_id)
+        result = await self.db.execute(stmt)
+        user = result.scalar_one_or_none()
+        if not user:
+            raise NotFoundException(detail=f"Không tìm thấy tài khoản ID={user_id}.")
+        user.tk_vaitro = VaiTroModel(new_role)
+        await self.db.commit()
+        await self.db.refresh(user)
+        return {
+            "tk_id": user.tk_id,
+            "tk_vaitro": user.tk_vaitro,
+        }
+
+    async def update_user_status(self, user_id: int, xoa: bool) -> dict:
+        """Lock/unlock user (soft delete)."""
+        stmt = select(TaiKhoan).where(TaiKhoan.tk_id == user_id)
+        result = await self.db.execute(stmt)
+        user = result.scalar_one_or_none()
+        if not user:
+            raise NotFoundException(detail=f"Không tìm thấy tài khoản ID={user_id}.")
+        user.tk_xoa = xoa
+        user.tk_xoaluc = datetime.now(timezone.utc) if xoa else None
+        await self.db.commit()
+        await self.db.refresh(user)
+        return {
+            "tk_id": user.tk_id,
+            "tk_xoa": user.tk_xoa,
+        }
+
+    # ══════════════════════════════════════════════════════
     # Label Management (sửa nhãn)
     # ══════════════════════════════════════════════════════
 

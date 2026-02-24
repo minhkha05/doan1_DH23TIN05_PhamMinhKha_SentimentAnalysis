@@ -18,10 +18,11 @@ import {
     HiOutlineMoon,
     HiOutlineBars3,
     HiOutlineXMark,
-    HiOutlineSparkles,
 } from 'react-icons/hi2';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import logoImg from '../../assets/logo sentiment.png';
+import '../../pages/public/AuthPages.css'; // for confirm-overlay styles
 import './Sidebar.css';
 
 const Sidebar: React.FC = () => {
@@ -30,8 +31,10 @@ const Sidebar: React.FC = () => {
     const navigate = useNavigate();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
     const handleLogout = () => {
+        setShowLogoutConfirm(false);
         logout();
         navigate('/login');
     };
@@ -70,8 +73,8 @@ const Sidebar: React.FC = () => {
                 {/* Logo */}
                 <div className="sidebar-header">
                     <div className="sidebar-logo">
-                        <div className="sidebar-logo-icon">
-                            <HiOutlineSparkles size={20} />
+                        <div className="sidebar-logo-icon" style={{ background: 'transparent', boxShadow: 'none' }}>
+                            <img src={logoImg} alt="SentimentAI Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                         </div>
                         {!collapsed && <span className="sidebar-logo-text">SentimentAI</span>}
                     </div>
@@ -151,7 +154,11 @@ const Sidebar: React.FC = () => {
                         </div>
                     )}
 
-                    <button className="sidebar-link sidebar-logout" onClick={handleLogout} title="Đăng xuất">
+                    <button
+                        className="sidebar-link sidebar-logout"
+                        onClick={() => setShowLogoutConfirm(true)}
+                        title="Đăng xuất"
+                    >
                         <span className="sidebar-link-icon">
                             <HiOutlineArrowLeftOnRectangle />
                         </span>
@@ -159,6 +166,24 @@ const Sidebar: React.FC = () => {
                     </button>
                 </div>
             </aside>
+
+            {/* ── Logout Confirmation Dialog ──────────────── */}
+            {showLogoutConfirm && (
+                <div className="confirm-overlay" onClick={() => setShowLogoutConfirm(false)}>
+                    <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+                        <h3>Đăng xuất</h3>
+                        <p>Bạn có chắc muốn đăng xuất khỏi hệ thống không?</p>
+                        <div className="confirm-actions">
+                            <button className="btn btn-ghost" onClick={() => setShowLogoutConfirm(false)}>
+                                Hủy
+                            </button>
+                            <button className="btn btn-primary" onClick={handleLogout}>
+                                Đăng xuất
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

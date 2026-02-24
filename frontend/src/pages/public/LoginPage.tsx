@@ -2,12 +2,13 @@
    Login Page
    ═══════════════════════════════════════════════════ */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { HiOutlineSparkles, HiOutlineEnvelope, HiOutlineLockClosed, HiOutlineEye, HiOutlineEyeSlash } from 'react-icons/hi2';
+import { HiOutlineEnvelope, HiOutlineLockClosed, HiOutlineEye, HiOutlineEyeSlash, HiOutlineArrowLeft } from 'react-icons/hi2';
 import { useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/authService';
 import toast from 'react-hot-toast';
+import logoImg from '../../assets/logo sentiment.png';
 import './AuthPages.css';
 
 const LoginPage: React.FC = () => {
@@ -16,6 +17,16 @@ const LoginPage: React.FC = () => {
     const [formData, setFormData] = useState({ email: '', matkhau: '' });
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [rememberMe, setRememberMe] = useState(false);
+
+    useEffect(() => {
+        const savedEmail = localStorage.getItem('sentiment_remember_email');
+        const savedPw = localStorage.getItem('sentiment_remember_matkhau');
+        if (savedEmail && savedPw) {
+            setFormData({ email: savedEmail, matkhau: atob(savedPw) });
+            setRememberMe(true);
+        }
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -30,6 +41,13 @@ const LoginPage: React.FC = () => {
                 matkhau: formData.matkhau,
             });
             login(result);
+            if (rememberMe) {
+                localStorage.setItem('sentiment_remember_email', formData.email);
+                localStorage.setItem('sentiment_remember_matkhau', btoa(formData.matkhau));
+            } else {
+                localStorage.removeItem('sentiment_remember_email');
+                localStorage.removeItem('sentiment_remember_matkhau');
+            }
             toast.success('Đăng nhập thành công!');
             navigate(result.vaitro === 'admin' ? '/admin/dashboard' : '/home');
         } catch (err: any) {
@@ -43,11 +61,17 @@ const LoginPage: React.FC = () => {
     return (
         <div className="auth-page">
             <div className="auth-glow" />
+
+            {/* Back to Landing */}
+            <button className="auth-back-btn btn btn-ghost" onClick={() => navigate('/')}>
+                <HiOutlineArrowLeft /> Trang chủ
+            </button>
+
             <div className="auth-container animate-scale-in">
                 <div className="auth-card glass-card-static">
                     <div className="auth-header">
-                        <div className="auth-logo">
-                            <HiOutlineSparkles size={24} />
+                        <div className="auth-logo" style={{ background: 'transparent', boxShadow: 'none', width: '64px', height: '64px' }}>
+                            <img src={logoImg} alt="SentimentAI Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                         </div>
                         <h1>Đăng nhập</h1>
                         <p>Chào mừng trở lại! Vui lòng đăng nhập để tiếp tục.</p>
@@ -88,9 +112,25 @@ const LoginPage: React.FC = () => {
                                     className="auth-eye-btn"
                                     onClick={() => setShowPassword(!showPassword)}
                                     tabIndex={-1}
+                                    title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                                 >
                                     {showPassword ? <HiOutlineEyeSlash /> : <HiOutlineEye />}
                                 </button>
+                            </div>
+                        </div>
+
+                        <div className="auth-options">
+                            <label className="auth-remember-checkbox">
+                                <input
+                                    type="checkbox"
+                                    checked={rememberMe}
+                                    onChange={(e) => setRememberMe(e.target.checked)}
+                                />
+                                <span className="checkmark"></span>
+                                Ghi nhớ mật khẩu
+                            </label>
+                            <div className="auth-forgot-link">
+                                <Link to="/forgot-password">Quên mật khẩu?</Link>
                             </div>
                         </div>
 

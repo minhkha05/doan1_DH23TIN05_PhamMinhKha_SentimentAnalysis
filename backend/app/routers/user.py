@@ -77,3 +77,24 @@ async def get_history(
         total_pages=total_pages,
         items=[HistoryItem(**item) for item in items],
     )
+
+
+# ══════════════════════════════════════════════════════════
+# POST /analyze-free (no auth, no DB save)
+# ══════════════════════════════════════════════════════════
+
+@router.post(
+    "/analyze-free",
+    summary="Phân tích cảm xúc miễn phí (không lưu DB)",
+    description="Cho người dùng chưa đăng nhập thử trải nghiệm AI. Không lưu kết quả.",
+)
+async def analyze_free(body: AnalyzeRequest):
+    from app.services.ai_service import predict_sentiment
+
+    prediction = await predict_sentiment(body.noidung)
+    return {
+        "camxuc": prediction["camxuc"],
+        "tincay": prediction["tincay"],
+        "noidung": body.noidung,
+        "model": prediction["model"],
+    }

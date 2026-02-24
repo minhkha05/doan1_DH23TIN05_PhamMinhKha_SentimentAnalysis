@@ -4,9 +4,10 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { HiOutlineSparkles, HiOutlineEnvelope, HiOutlineLockClosed, HiOutlinePhone, HiOutlineEye, HiOutlineEyeSlash } from 'react-icons/hi2';
+import { HiOutlineEnvelope, HiOutlineLockClosed, HiOutlinePhone, HiOutlineEye, HiOutlineEyeSlash, HiOutlineArrowLeft } from 'react-icons/hi2';
 import { authService } from '../../services/authService';
 import toast from 'react-hot-toast';
+import logoImg from '../../assets/logo sentiment.png';
 import './AuthPages.css';
 
 const RegisterPage: React.FC = () => {
@@ -50,11 +51,17 @@ const RegisterPage: React.FC = () => {
     return (
         <div className="auth-page">
             <div className="auth-glow" />
+
+            {/* Back to Landing */}
+            <button className="auth-back-btn btn btn-ghost" onClick={() => navigate('/')}>
+                <HiOutlineArrowLeft /> Trang chủ
+            </button>
+
             <div className="auth-container animate-scale-in">
                 <div className="auth-card glass-card-static">
                     <div className="auth-header">
-                        <div className="auth-logo">
-                            <HiOutlineSparkles size={24} />
+                        <div className="auth-logo" style={{ background: 'transparent', boxShadow: 'none', width: '64px', height: '64px' }}>
+                            <img src={logoImg} alt="SentimentAI Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                         </div>
                         <h1>Tạo tài khoản</h1>
                         <p>Đăng ký miễn phí để bắt đầu phân tích cảm xúc.</p>
@@ -108,6 +115,7 @@ const RegisterPage: React.FC = () => {
                                     className="auth-eye-btn"
                                     onClick={() => setShowPassword(!showPassword)}
                                     tabIndex={-1}
+                                    title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                                 >
                                     {showPassword ? <HiOutlineEyeSlash /> : <HiOutlineEye />}
                                 </button>

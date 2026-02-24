@@ -15,6 +15,7 @@ import {
 } from 'react-icons/hi2';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
+import logoImg from '../../assets/logo sentiment.png';
 import './LandingPage.css';
 
 const LandingPage: React.FC = () => {
@@ -51,8 +52,8 @@ const LandingPage: React.FC = () => {
             <header className="landing-nav">
                 <div className="landing-nav-inner">
                     <div className="landing-brand">
-                        <div className="landing-brand-icon">
-                            <HiOutlineSparkles size={18} />
+                        <div className="landing-brand-icon" style={{ background: 'transparent', boxShadow: 'none' }}>
+                            <img src={logoImg} alt="SentimentAI Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                         </div>
                         <span className="landing-brand-text">SentimentAI</span>
                     </div>
@@ -86,29 +87,27 @@ const LandingPage: React.FC = () => {
                         <HiOutlineSparkles /> Powered by PhoBERT AI
                     </div>
                     <h1 className="landing-hero-title">
-                        Phân tích <span className="text-gradient">Cảm xúc</span> Văn bản
+                        Phân tích <span className="text-gradient">Cảm xúc</span> Đánh giá Sản phẩm
                         <br />Tiếng Việt bằng AI
                     </h1>
                     <p className="landing-hero-desc">
-                        Hệ thống phân tích cảm xúc tiên tiến sử dụng mô hình AI PhoBERT,
-                        được tối ưu hóa cho tiếng Việt. Phát hiện Tích cực, Tiêu cực và Trung tính
-                        với độ chính xác cao.
+                        Ứng dụng trí tuệ nhân tạo PhoBERT tối ưu cho tiếng Việt để phân tích cảm xúc trong đánh giá sản phẩm và phản hồi khách hàng. Nhận diện Tích cực, Tiêu cực và Trung tính nhanh chóng với độ chính xác cao, giúp bạn hiểu rõ cảm nhận người dùng chỉ trong vài giây.
                     </p>
                     <div className="landing-hero-actions">
                         <button
                             className="btn btn-primary btn-lg"
-                            onClick={() => navigate(isAuthenticated ? '/home' : '/register')}
+                            onClick={() => navigate(isAuthenticated ? '/home' : '/try')}
                         >
                             <HiOutlineSparkles />
                             Thử ngay miễn phí
                         </button>
                         <button className="btn btn-secondary btn-lg" onClick={() => navigate('/login')}>
-                            Xem Demo
+                            Đăng nhập
                         </button>
                     </div>
                     <div className="landing-hero-stats">
                         <div className="landing-stat">
-                            <span className="landing-stat-value">95%+</span>
+                            <span className="landing-stat-value">90%+</span>
                             <span className="landing-stat-label">Độ chính xác</span>
                         </div>
                         <div className="landing-stat-divider" />
@@ -155,7 +154,7 @@ const LandingPage: React.FC = () => {
 
             {/* Footer */}
             <footer className="landing-footer">
-                <p>&copy; 2026 SentimentAI. Đồ án 1 — Phạm Minh Kha — DH23TIN05.</p>
+                <p>&copy; 2026 SentimentAI. Đồ án 1 — Phạm Minh Kha — 235186 — DH23TIN05.</p>
             </footer>
         </div>
     );

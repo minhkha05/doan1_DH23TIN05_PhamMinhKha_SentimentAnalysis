@@ -15,6 +15,8 @@ import AppLayout from './components/layout/AppLayout';
 import LandingPage from './pages/public/LandingPage';
 import LoginPage from './pages/public/LoginPage';
 import RegisterPage from './pages/public/RegisterPage';
+import ForgotPasswordPage from './pages/public/ForgotPasswordPage';
+import FreeTrialPage from './pages/public/FreeTrialPage';
 
 // User pages
 import HomePage from './pages/user/HomePage';
@@ -38,6 +40,8 @@ const App: React.FC = () => {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/try" element={<FreeTrialPage />} />
 
             {/* ── Protected routes (user) ───────────── */}
             <Route
