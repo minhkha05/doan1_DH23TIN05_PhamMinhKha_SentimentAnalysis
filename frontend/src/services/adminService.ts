@@ -4,12 +4,14 @@
 
 import api from './api';
 import type {
+    AdminTextItem,
     DashboardStats,
     ExportItem,
     ExportResponse,
     LabelUpdateRequest,
     LabelUpdateResponse,
     PaginatedResponse,
+    SuccessResponse,
 } from '../types';
 
 const ADMIN_PREFIX = '/api/v1/admin';
@@ -34,6 +36,26 @@ export interface ModelInfo {
     model_type: string;
     version: string;
     techniques: string[];
+    hidden_size?: number;
+    num_hidden_layers?: number;
+    num_attention_heads?: number;
+    vocab_size?: number;
+    max_position_embeddings?: number;
+    problem_type?: string;
+    // Training metrics (optional)
+    accuracy?: number;
+    test_accuracy?: number;
+    val_accuracy?: number;
+    f1_score?: number;
+    precision?: number;
+    recall?: number;
+    train_loss?: number;
+    val_loss?: number;
+    epochs?: number;
+    learning_rate?: number;
+    batch_size?: number;
+    train_samples?: number;
+    val_samples?: number;
 }
 
 export const adminService = {
@@ -61,6 +83,16 @@ export const adminService = {
 
     updateUserStatus: async (userId: number, xoa: boolean): Promise<any> => {
         const res = await api.put(`${ADMIN_PREFIX}/users/${userId}/status`, { xoa });
+        return res.data;
+    },
+
+    deleteUser: async (userId: number): Promise<SuccessResponse> => {
+        const res = await api.delete(`${ADMIN_PREFIX}/users/${userId}`);
+        return res.data;
+    },
+
+    updateUserPhone: async (userId: number, sdt: string): Promise<SuccessResponse> => {
+        const res = await api.put(`${ADMIN_PREFIX}/users/${userId}/phone`, { sdt });
         return res.data;
     },
 
@@ -104,6 +136,21 @@ export const adminService = {
 
     setActiveModel: async (model_name: string): Promise<any> => {
         const res = await api.put(`${ADMIN_PREFIX}/models/active`, { model_name });
+        return res.data;
+    },
+
+    // ── Texts management ───────────────────────────
+    getTexts: async (params: {
+        page?: number;
+        page_size?: number;
+        search?: string;
+    }): Promise<PaginatedResponse<AdminTextItem>> => {
+        const res = await api.get(`${ADMIN_PREFIX}/texts`, { params });
+        return res.data;
+    },
+
+    deleteText: async (vbId: number): Promise<SuccessResponse> => {
+        const res = await api.delete(`${ADMIN_PREFIX}/texts/${vbId}`);
         return res.data;
     },
 };

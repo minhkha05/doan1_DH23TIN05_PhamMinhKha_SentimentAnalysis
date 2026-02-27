@@ -14,11 +14,15 @@ from app.models.models import TaiKhoan
 from app.schemas.schemas import (
     AnalyzeRequest,
     AnalyzeResponse,
+    ChangePasswordRequest,
     HistoryItem,
     KetQuaResponse,
     PaginatedResponse,
+    SuccessResponse,
+    UpdatePhoneRequest,
 )
 from app.services.analysis_service import AnalysisService
+from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/api/v1/user", tags=["User"])
 
@@ -98,3 +102,92 @@ async def analyze_free(body: AnalyzeRequest):
         "noidung": body.noidung,
         "model": prediction["model"],
     }
+
+
+# ════════════════════════════════════════════════════════
+# DELETE /history/clear (Đặt trước /{id} để tránh conflict)
+# ════════════════════════════════════════════════════════
+
+@router.delete(
+    "/history/clear",
+    response_model=SuccessResponse,
+    summary="Xóa tất cả lịch sử",
+    description="Soft-delete toàn bộ lịch sử phân tích của user.",
+)
+async def clear_history(
+    current_user: TaiKhoan = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AnalysisService(db)
+    count = await service.clear_history(user_id=current_user.tk_id)
+    return SuccessResponse(
+        message=f"Đã xóa {count} mục lịch sử.",
+        data={"deleted_count": count},
+    )
+
+
+# ════════════════════════════════════════════════════════
+# DELETE /history/{vb_id}
+# ════════════════════════════════════════════════════════
+
+@router.delete(
+    "/history/{vb_id}",
+    response_model=SuccessResponse,
+    summary="Xóa 1 mục lịch sử",
+    description="Soft-delete một bản ghi lịch sử phân tích.",
+)
+async def delete_history_item(
+    vb_id: int,
+    current_user: TaiKhoan = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AnalysisService(db)
+    await service.delete_history_item(user_id=current_user.tk_id, vb_id=vb_id)
+    return SuccessResponse(message="Đã xóa mục lịch sử.")
+
+
+# ════════════════════════════════════════════════════════
+# PUT /password
+# ════════════════════════════════════════════════════════
+
+@router.put(
+    "/password",
+    response_model=SuccessResponse,
+    summary="Đổi mật khẩu",
+    description="Đổi mật khẩu tài khoản (yêu cầu nhập mật khẩu cũ).",
+)
+async def change_password(
+    body: ChangePasswordRequest,
+    current_user: TaiKhoan = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AuthService(db)
+    await service.change_password(
+        user_id=current_user.tk_id,
+        current_password=body.current_password,
+        new_password=body.new_password,
+    )
+    return SuccessResponse(message="Đổi mật khẩu thành công.")
+
+
+# ════════════════════════════════════════════════════════
+# PUT /phone
+# ════════════════════════════════════════════════════════
+
+@router.put(
+    "/phone",
+    response_model=SuccessResponse,
+    summary="Cập nhật số điện thoại",
+    description="Cập nhật số điện thoại của tài khoản hiện tại.",
+)
+async def update_phone(
+    body: UpdatePhoneRequest,
+    current_user: TaiKhoan = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AuthService(db)
+    result = await service.update_phone(
+        user_id=current_user.tk_id,
+        new_sdt=body.sdt,
+    )
+    return SuccessResponse(message="Cập nhật số điện thoại thành công.", data=result)

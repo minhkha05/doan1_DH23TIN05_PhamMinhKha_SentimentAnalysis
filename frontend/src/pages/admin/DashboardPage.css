@@ -146,6 +146,67 @@
     background: linear-gradient(90deg, #f59e0b, #fbbf24);
 }
 
+/* ── Chart Container ────────────────────────────── */
+.dashboard-chart-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.dashboard-chart-tooltip {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    box-shadow: var(--shadow-md);
+}
+
+.dashboard-chart-tooltip strong {
+    color: var(--text-primary);
+}
+
+.dashboard-chart-tooltip span {
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+}
+
+.dashboard-sentiment-summary {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+}
+
+.dashboard-sentiment-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.dashboard-sentiment-badge-val {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+}
+
+/* ── Area Chart ─────────────────────────────────── */
+.dashboard-area-chart {
+    padding: var(--space-6);
+    margin-top: var(--space-5);
+}
+
+.dashboard-area-chart h3 {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    margin-bottom: var(--space-5);
+}
+
 /* ── Daily Trend ────────────────────────────────── */
 .dashboard-trend-list {
     display: flex;

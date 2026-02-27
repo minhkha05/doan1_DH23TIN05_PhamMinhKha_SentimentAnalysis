@@ -30,6 +30,7 @@ def _get_models_dir() -> Path:
 def list_available_models() -> list[dict]:
     """
     Scan the /models directory for any model folders.
+    Reads config.json and training_config.json for detailed metrics.
     """
     models_dir = _get_models_dir()
     if not models_dir.exists():
@@ -40,7 +41,7 @@ def list_available_models() -> list[dict]:
         if not entry.is_dir() or entry.name.startswith("."):
             continue
 
-        results.append({
+        model_info = {
             "name": entry.name,
             "path": str(entry),
             "architecture": "N/A",
@@ -48,7 +49,52 @@ def list_available_models() -> list[dict]:
             "model_type": "N/A",
             "version": "N/A",
             "techniques": [],
-        })
+            "hidden_size": None,
+            "num_hidden_layers": None,
+            "num_attention_heads": None,
+            "vocab_size": None,
+            "max_position_embeddings": None,
+            "problem_type": None,
+        }
+
+        # Read config.json
+        config_path = entry / "config.json"
+        if config_path.exists():
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                archs = cfg.get("architectures", [])
+                model_info["architecture"] = archs[0] if archs else "N/A"
+                model_info["num_labels"] = cfg.get("num_labels", len(cfg.get("id2label", {})))
+                model_info["model_type"] = cfg.get("model_type", "N/A")
+                model_info["hidden_size"] = cfg.get("hidden_size")
+                model_info["num_hidden_layers"] = cfg.get("num_hidden_layers")
+                model_info["num_attention_heads"] = cfg.get("num_attention_heads")
+                model_info["vocab_size"] = cfg.get("vocab_size")
+                model_info["max_position_embeddings"] = cfg.get("max_position_embeddings")
+                model_info["problem_type"] = cfg.get("problem_type")
+            except Exception:
+                pass
+
+        # Read training_config.json
+        train_config_path = entry / "training_config.json"
+        if train_config_path.exists():
+            try:
+                with open(train_config_path, "r", encoding="utf-8") as f:
+                    tcfg = json.load(f)
+                model_info["version"] = tcfg.get("version", "N/A")
+                model_info["techniques"] = tcfg.get("techniques", [])
+                # Additional training metrics if available
+                for key in ["accuracy", "f1_score", "precision", "recall",
+                            "epochs", "learning_rate", "batch_size",
+                            "train_samples", "val_samples", "test_accuracy",
+                            "val_accuracy", "train_loss", "val_loss"]:
+                    if key in tcfg:
+                        model_info[key] = tcfg[key]
+            except Exception:
+                pass
+
+        results.append(model_info)
     return results
 
 

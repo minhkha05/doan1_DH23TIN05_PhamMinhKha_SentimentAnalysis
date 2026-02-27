@@ -8,7 +8,7 @@ import os
 from datetime import datetime, timezone
 from typing import List, Tuple
 
-from sqlalchemy import case, func, select, text
+from sqlalchemy import case, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -209,13 +209,73 @@ class AdminService:
         if not user:
             raise NotFoundException(detail=f"Không tìm thấy tài khoản ID={user_id}.")
         user.tk_xoa = xoa
-        user.tk_xoaluc = datetime.now(timezone.utc) if xoa else None
+        user.tk_xoaluc = datetime.now(timezone.utc).replace(tzinfo=None) if xoa else None
         await self.db.commit()
         await self.db.refresh(user)
         return {
             "tk_id": user.tk_id,
             "tk_xoa": user.tk_xoa,
         }
+
+    async def delete_user(self, user_id: int) -> None:
+        """Soft-delete a user and all their vanban + ketqua."""
+        stmt = select(TaiKhoan).where(TaiKhoan.tk_id == user_id)
+        result = await self.db.execute(stmt)
+        user = result.scalar_one_or_none()
+        if not user:
+            raise NotFoundException(detail=f"Không tìm thấy tài khoản ID={user_id}.")
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        user.tk_xoa = True
+        user.tk_xoaluc = now
+
+        # Soft-delete all user's vanban
+        vb_ids_stmt = select(VanBan.vb_id).where(
+            VanBan.vb_tk_id == user_id,
+            VanBan.vb_xoa == False,  # noqa: E712
+        )
+        vb_ids_result = await self.db.execute(vb_ids_stmt)
+        vb_ids = [row[0] for row in vb_ids_result.all()]
+
+        if vb_ids:
+            await self.db.execute(
+                update(VanBan)
+                .where(VanBan.vb_id.in_(vb_ids))
+                .values(vb_xoa=True, vb_xoaluc=now)
+            )
+            await self.db.execute(
+                update(KetQua)
+                .where(KetQua.kq_vb_id.in_(vb_ids), KetQua.kq_xoa == False)  # noqa: E712
+                .values(kq_xoa=True, kq_xoaluc=now)
+            )
+
+        await self.db.commit()
+
+    async def update_user_phone(self, user_id: int, new_sdt: str) -> dict:
+        """Admin updates a user's phone number."""
+        from sqlalchemy import or_
+
+        stmt = select(TaiKhoan).where(TaiKhoan.tk_id == user_id)
+        result = await self.db.execute(stmt)
+        user = result.scalar_one_or_none()
+        if not user:
+            raise NotFoundException(detail=f"Không tìm thấy tài khoản ID={user_id}.")
+
+        # Check duplicate phone
+        if new_sdt:
+            dup_stmt = select(TaiKhoan).where(
+                TaiKhoan.tk_sdt == new_sdt,
+                TaiKhoan.tk_id != user_id,
+            )
+            dup = await self.db.execute(dup_stmt)
+            if dup.scalar_one_or_none():
+                from app.core.exceptions import ConflictException
+                raise ConflictException(detail="Số điện thoại đã được sử dụng bởi tài khoản khác.")
+
+        user.tk_sdt = new_sdt if new_sdt else None
+        await self.db.commit()
+        await self.db.refresh(user)
+        return {"tk_id": user.tk_id, "tk_sdt": user.tk_sdt}
 
     # ══════════════════════════════════════════════════════
     # Label Management (sửa nhãn)
@@ -320,6 +380,80 @@ class AdminService:
         return data, total
 
     # ══════════════════════════════════════════════════════
+    # Text Management (admin quản lý văn bản)
+    # ══════════════════════════════════════════════════════
+
+    async def list_texts(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        search: str | None = None,
+    ) -> Tuple[List[dict], int]:
+        """List all texts with user info and AI result (paginated)."""
+        conditions = [VanBan.vb_xoa == False]  # noqa: E712
+        if search:
+            conditions.append(VanBan.vb_noidung.ilike(f"%{search}%"))
+
+        count_stmt = select(func.count()).select_from(VanBan)
+        for c in conditions:
+            count_stmt = count_stmt.where(c)
+        total = (await self.db.execute(count_stmt)).scalar() or 0
+
+        offset = (page - 1) * page_size
+        stmt = (
+            select(VanBan)
+            .where(*conditions)
+            .options(
+                selectinload(VanBan.ket_qua),
+                selectinload(VanBan.tai_khoan),
+            )
+            .order_by(VanBan.vb_id.desc())
+            .offset(offset)
+            .limit(page_size)
+        )
+        result = await self.db.execute(stmt)
+        items = result.scalars().all()
+
+        data = []
+        for vb in items:
+            kq = next((k for k in vb.ket_qua if not k.kq_xoa), None)
+            data.append({
+                "vb_id": vb.vb_id,
+                "noidung": vb.vb_noidung,
+                "user_email": vb.tai_khoan.tk_email if vb.tai_khoan else None,
+                "user_sdt": vb.tai_khoan.tk_sdt if vb.tai_khoan else None,
+                "camxuc_ai": kq.kq_camxuc if kq else None,
+                "tincay": kq.kq_tincay if kq else None,
+                "vb_taoluc": vb.vb_taoluc,
+            })
+
+        return data, total
+
+    async def delete_text(self, vb_id: int) -> None:
+        """Soft-delete a text (admin removes spam/junk)."""
+        stmt = select(VanBan).where(
+            VanBan.vb_id == vb_id,
+            VanBan.vb_xoa == False,  # noqa: E712
+        )
+        result = await self.db.execute(stmt)
+        van_ban = result.scalar_one_or_none()
+        if not van_ban:
+            raise NotFoundException(detail=f"Không tìm thấy văn bản ID={vb_id}.")
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        van_ban.vb_xoa = True
+        van_ban.vb_xoaluc = now
+
+        # Soft-delete related ketqua
+        await self.db.execute(
+            update(KetQua)
+            .where(KetQua.kq_vb_id == vb_id, KetQua.kq_xoa == False)  # noqa: E712
+            .values(kq_xoa=True, kq_xoaluc=now)
+        )
+
+        await self.db.commit()
+
+    # ══════════════════════════════════════════════════════
     # Smart Data Export – COALESCE(suanhan.camxuc, ketqua.camxuc)
     # ══════════════════════════════════════════════════════
 
@@ -347,7 +481,19 @@ class AdminService:
             .subquery("latest_sn")
         )
 
-        # Main query
+        # Subquery to get the first (latest) non-deleted ketqua per vanban
+        # This avoids duplicate rows when a vanban has multiple ketqua
+        first_kq_subq = (
+            select(
+                KetQua.kq_vb_id,
+                func.min(KetQua.kq_id).label("first_kq_id"),
+            )
+            .where(KetQua.kq_xoa == False)  # noqa: E712
+            .group_by(KetQua.kq_vb_id)
+            .subquery("first_kq")
+        )
+
+        # Main query – JOIN only with the first ketqua per vanban to avoid duplicates
         stmt = (
             select(
                 VanBan.vb_id,
@@ -361,7 +507,16 @@ class AdminService:
                 ).label("camxuc_final"),
                 VanBan.vb_taoluc,
             )
-            .join(KetQua, KetQua.kq_vb_id == VanBan.vb_id, isouter=True)
+            .join(
+                first_kq_subq,
+                first_kq_subq.c.kq_vb_id == VanBan.vb_id,
+                isouter=True,
+            )
+            .join(
+                KetQua,
+                KetQua.kq_id == first_kq_subq.c.first_kq_id,
+                isouter=True,
+            )
             .join(
                 latest_sn_subq,
                 latest_sn_subq.c.sn_vb_id == VanBan.vb_id,
@@ -373,7 +528,7 @@ class AdminService:
             .order_by(VanBan.vb_id)
         )
 
-        # Count total
+        # Count total (distinct vanban)
         count_stmt = (
             select(func.count())
             .select_from(VanBan)

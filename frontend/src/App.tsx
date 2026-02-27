@@ -29,6 +29,7 @@ import UsersPage from './pages/admin/UsersPage';
 import LabelsPage from './pages/admin/LabelsPage';
 import TestModelPage from './pages/admin/TestModelPage';
 import ExportPage from './pages/admin/ExportPage';
+import TextsPage from './pages/admin/TextsPage';
 
 const App: React.FC = () => {
   return (
@@ -66,6 +67,7 @@ const App: React.FC = () => {
             >
               <Route path="/admin/dashboard" element={<DashboardPage />} />
               <Route path="/admin/users" element={<UsersPage />} />
+              <Route path="/admin/texts" element={<TextsPage />} />
               <Route path="/admin/labels" element={<LabelsPage />} />
               <Route path="/admin/test-model" element={<TestModelPage />} />
               <Route path="/admin/export" element={<ExportPage />} />

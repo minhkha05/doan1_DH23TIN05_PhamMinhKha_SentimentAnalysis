@@ -103,3 +103,91 @@
     font-weight: 500;
     color: var(--text-primary);
 }
+
+/* ── Password Change Form ──────────────────────── */
+.profile-section-title {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-5);
+}
+
+.profile-password-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.profile-password-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.profile-password-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.profile-password-input-wrapper .input {
+    width: 100%;
+    padding-right: var(--space-10);
+}
+
+.profile-eye-btn {
+    position: absolute;
+    right: var(--space-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    color: var(--text-tertiary);
+    transition: color var(--transition-fast);
+    cursor: pointer;
+    background: none;
+    border: none;
+}
+
+.profile-eye-btn:hover {
+    color: var(--primary-500);
+}
+
+/* ── Phone Edit ────────────────────────────────── */
+.profile-phone-display {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.profile-edit-phone-btn {
+    padding: 2px 6px !important;
+    color: var(--text-tertiary) !important;
+    opacity: 0.6;
+    transition: opacity var(--transition-fast);
+}
+
+.profile-edit-phone-btn:hover {
+    opacity: 1;
+    color: var(--primary-500) !important;
+}
+
+.profile-phone-edit {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+}
+
+.profile-phone-input {
+    width: 180px;
+    padding: var(--space-1) var(--space-2) !important;
+    font-size: var(--text-sm) !important;
+}
+
+.profile-phone-save-btn {
+    padding: 4px 8px !important;
+}

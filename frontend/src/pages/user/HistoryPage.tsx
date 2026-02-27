@@ -10,6 +10,7 @@ import {
     HiOutlineMinusCircle,
     HiOutlineChevronLeft,
     HiOutlineChevronRight,
+    HiOutlineTrash,
 } from 'react-icons/hi2';
 import { userService } from '../../services/userService';
 import type { HistoryItem, CamXuc } from '../../types';
@@ -30,6 +31,12 @@ const HistoryPage: React.FC = () => {
     const [total, setTotal] = useState(0);
     const pageSize = 10;
 
+    // Confirm dialog state
+    const [confirmAction, setConfirmAction] = useState<{
+        type: 'delete-one' | 'clear-all';
+        vbId?: number;
+    } | null>(null);
+
     const fetchHistory = useCallback(async () => {
         setLoading(true);
         try {
@@ -48,11 +55,47 @@ const HistoryPage: React.FC = () => {
         fetchHistory();
     }, [fetchHistory]);
 
+    const handleDeleteOne = async (vbId: number) => {
+        try {
+            await userService.deleteHistoryItem(vbId);
+            toast.success('Đã xóa mục lịch sử.');
+            setConfirmAction(null);
+            fetchHistory();
+        } catch (err: any) {
+            toast.error(err.response?.data?.detail || 'Lỗi khi xóa.');
+        }
+    };
+
+    const handleClearAll = async () => {
+        try {
+            const res = await userService.clearHistory();
+            toast.success(res.message || 'Đã xóa tất cả lịch sử.');
+            setConfirmAction(null);
+            setPage(1);
+            fetchHistory();
+        } catch (err: any) {
+            toast.error(err.response?.data?.detail || 'Lỗi khi xóa.');
+        }
+    };
+
     return (
         <div className="history-page">
             <div className="history-header animate-fade-in-down">
-                <h1><HiOutlineClock /> Lịch sử phân tích</h1>
-                <p>Tổng cộng <strong>{total}</strong> lần phân tích</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                        <h1><HiOutlineClock /> Lịch sử phân tích</h1>
+                        <p>Tổng cộng <strong>{total}</strong> lần phân tích</p>
+                    </div>
+                    {total > 0 && (
+                        <button
+                            className="btn btn-ghost"
+                            style={{ color: 'var(--negative)', gap: 'var(--space-2)', display: 'inline-flex', alignItems: 'center' }}
+                            onClick={() => setConfirmAction({ type: 'clear-all' })}
+                        >
+                            <HiOutlineTrash /> Xóa tất cả
+                        </button>
+                    )}
+                </div>
             </div>
 
             {loading ? (
@@ -100,6 +143,13 @@ const HistoryPage: React.FC = () => {
                                                 )}
                                             </>
                                         )}
+                                        <button
+                                            className="btn-icon history-delete-btn"
+                                            title="Xóa"
+                                            onClick={() => setConfirmAction({ type: 'delete-one', vbId: item.vb_id })}
+                                        >
+                                            <HiOutlineTrash />
+                                        </button>
                                     </div>
                                 </div>
                             );
@@ -147,6 +197,38 @@ const HistoryPage: React.FC = () => {
                         </div>
                     )}
                 </>
+            )}
+
+            {/* ── Confirm Dialog ──────────────────────── */}
+            {confirmAction && (
+                <div className="confirm-overlay" onClick={() => setConfirmAction(null)}>
+                    <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+                        <h3>Xác nhận xóa</h3>
+                        <p>
+                            {confirmAction.type === 'clear-all'
+                                ? 'Bạn có chắc muốn xóa TẤT CẢ lịch sử phân tích không? Hành động này không thể hoàn tác.'
+                                : 'Bạn có chắc muốn xóa mục lịch sử này không?'}
+                        </p>
+                        <div className="confirm-actions">
+                            <button className="btn btn-ghost" onClick={() => setConfirmAction(null)}>
+                                Hủy
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                style={{ background: 'var(--negative)' }}
+                                onClick={() => {
+                                    if (confirmAction.type === 'clear-all') {
+                                        handleClearAll();
+                                    } else if (confirmAction.vbId) {
+                                        handleDeleteOne(confirmAction.vbId);
+                                    }
+                                }}
+                            >
+                                Xóa
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

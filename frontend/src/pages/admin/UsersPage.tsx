@@ -16,6 +16,7 @@ import {
     HiOutlinePhone,
     HiOutlineFunnel,
     HiOutlineArrowPath,
+    HiOutlineTrash,
 } from 'react-icons/hi2';
 import { adminService, type AdminUserItem } from '../../services/adminService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -39,7 +40,7 @@ const UsersPage: React.FC = () => {
 
     // Confirm dialog
     const [confirmAction, setConfirmAction] = useState<{
-        type: 'role' | 'lock' | 'unlock';
+        type: 'role' | 'lock' | 'unlock' | 'delete';
         userId: number;
         label: string;
         value?: string;
@@ -96,6 +97,17 @@ const UsersPage: React.FC = () => {
             fetchUsers();
         } catch (err: any) {
             toast.error(err.response?.data?.detail || 'Lỗi cập nhật trạng thái.');
+        }
+    };
+
+    const handleDeleteUser = async (userId: number) => {
+        try {
+            await adminService.deleteUser(userId);
+            toast.success('Đã xóa tài khoản.');
+            setConfirmAction(null);
+            fetchUsers();
+        } catch (err: any) {
+            toast.error(err.response?.data?.detail || 'Lỗi xóa tài khoản.');
         }
     };
 
@@ -258,6 +270,21 @@ const UsersPage: React.FC = () => {
                                                             {u.tk_xoa ? <HiOutlineLockOpen size={16} /> : <HiOutlineLockClosed size={16} />}
                                                         </button>
                                                     )}
+
+                                                    {/* Delete */}
+                                                    {!isSelf && (
+                                                        <button
+                                                            className="btn btn-sm btn-ghost users-btn-danger"
+                                                            title="Xóa tài khoản"
+                                                            onClick={() => setConfirmAction({
+                                                                type: 'delete',
+                                                                userId: u.tk_id,
+                                                                label: `Xóa vĩnh viễn tài khoản ${u.tk_email || u.tk_sdt}? Toàn bộ dữ liệu liên quan sẽ bị xóa.`,
+                                                            })}
+                                                        >
+                                                            <HiOutlineTrash size={16} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -303,7 +330,7 @@ const UsersPage: React.FC = () => {
                                 Hủy
                             </button>
                             <button
-                                className="btn btn-primary"
+                                className={`btn ${confirmAction.type === 'delete' ? 'btn-danger' : 'btn-primary'}`}
                                 onClick={() => {
                                     if (confirmAction.type === 'role' && confirmAction.value) {
                                         handleRoleChange(confirmAction.userId, confirmAction.value);
@@ -311,10 +338,12 @@ const UsersPage: React.FC = () => {
                                         handleStatusChange(confirmAction.userId, true);
                                     } else if (confirmAction.type === 'unlock') {
                                         handleStatusChange(confirmAction.userId, false);
+                                    } else if (confirmAction.type === 'delete') {
+                                        handleDeleteUser(confirmAction.userId);
                                     }
                                 }}
                             >
-                                {confirmAction.type === 'lock' ? 'Khóa' : confirmAction.type === 'unlock' ? 'Mở khóa' : 'Xác nhận'}
+                                {confirmAction.type === 'lock' ? 'Khóa' : confirmAction.type === 'unlock' ? 'Mở khóa' : confirmAction.type === 'delete' ? 'Xóa' : 'Xác nhận'}
                             </button>
                         </div>
                     </div>
