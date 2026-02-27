@@ -137,3 +137,41 @@ class AuthService:
         if not user:
             raise NotFoundException(detail="Không tìm thấy tài khoản.")
         return user
+    # ── Update phone ──────────────────────────────────
+    async def update_phone(self, user_id: int, new_sdt: str) -> dict:
+        """Update current user's phone number."""
+        user = await self.get_user_by_id(user_id)
+
+        # Check duplicate
+        if new_sdt:
+            dup_stmt = select(TaiKhoan).where(
+                TaiKhoan.tk_sdt == new_sdt,
+                TaiKhoan.tk_id != user_id,
+            )
+            dup = await self.db.execute(dup_stmt)
+            if dup.scalar_one_or_none():
+                raise ConflictException(detail="Số điện thoại đã được sử dụng bởi tài khoản khác.")
+
+        user.tk_sdt = new_sdt if new_sdt else None
+        await self.db.commit()
+        await self.db.refresh(user)
+        return {"tk_id": user.tk_id, "tk_sdt": user.tk_sdt}
+
+    # ── Change password ───────────────────────────────
+    async def change_password(
+        self,
+        user_id: int,
+        current_password: str,
+        new_password: str,
+    ) -> None:
+        """
+        Change password for a user.
+        Verifies current password before updating.
+        """
+        user = await self.get_user_by_id(user_id)
+
+        if not verify_password(current_password, user.tk_matkhau):
+            raise BadRequestException(detail="Mật khẩu hiện tại không chính xác.")
+
+        user.tk_matkhau = hash_password(new_password)
+        await self.db.commit()

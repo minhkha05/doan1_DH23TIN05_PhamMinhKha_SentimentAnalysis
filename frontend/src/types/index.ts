@@ -130,3 +130,23 @@ export interface ApiError {
     success: false;
     detail: string;
 }
+
+// ── Password Change ───────────────────────────────
+export interface ChangePasswordRequest {
+    current_password: string;
+    new_password: string;
+}
+// ── Phone Update ───────────────────────────────────
+export interface UpdatePhoneRequest {
+    sdt: string;
+}
+// ── Admin Text Management ─────────────────────────
+export interface AdminTextItem {
+    vb_id: number;
+    noidung: string;
+    user_email: string | null;
+    user_sdt: string | null;
+    camxuc_ai: CamXuc | null;
+    tincay: number | null;
+    vb_taoluc: string | null;
+}

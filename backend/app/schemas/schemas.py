@@ -259,3 +259,35 @@ class ExportResponse(BaseModel):
     file: str
     sodong: int
     items: List[ExportItem]
+
+
+# ══════════════════════════════════════════════════════════
+# PASSWORD CHANGE Schema
+# ══════════════════════════════════════════════════════════
+
+class ChangePasswordRequest(BaseModel):
+    """Đổi mật khẩu – yêu cầu mật khẩu cũ + mới."""
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
+class UpdatePhoneRequest(BaseModel):
+    """Cập nhật số điện thoại."""
+    sdt: str = Field(..., min_length=9, max_length=20)
+
+
+# ══════════════════════════════════════════════════════════
+# ADMIN TEXT MANAGEMENT Schemas
+# ══════════════════════════════════════════════════════════
+
+class AdminTextItem(BaseModel):
+    """Thông tin văn bản cho admin texts list."""
+    vb_id: int
+    noidung: str
+    user_email: Optional[str] = None
+    user_sdt: Optional[str] = None
+    camxuc_ai: Optional[CamXucEnum] = None
+    tincay: Optional[float] = None
+    vb_taoluc: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)

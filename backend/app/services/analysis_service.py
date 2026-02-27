@@ -3,9 +3,10 @@ Analysis service – text analysis, history retrieval.
 Handles the flow: save text → call AI → save result → return.
 """
 
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -126,3 +127,68 @@ class AnalysisService:
             )
 
         return items, total
+
+    # ── Delete single history item (soft delete) ───────
+    async def delete_history_item(self, user_id: int, vb_id: int) -> None:
+        """
+        Soft-delete a single history item belonging to the user.
+        Also soft-deletes related ketqua rows.
+        """
+        stmt = select(VanBan).where(
+            VanBan.vb_id == vb_id,
+            VanBan.vb_tk_id == user_id,
+            VanBan.vb_xoa == False,  # noqa: E712
+        )
+        result = await self.db.execute(stmt)
+        van_ban = result.scalar_one_or_none()
+        if not van_ban:
+            raise NotFoundException(detail=f"Không tìm thấy lịch sử ID={vb_id}.")
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        van_ban.vb_xoa = True
+        van_ban.vb_xoaluc = now
+
+        # Soft-delete related ketqua
+        await self.db.execute(
+            update(KetQua)
+            .where(KetQua.kq_vb_id == vb_id, KetQua.kq_xoa == False)  # noqa: E712
+            .values(kq_xoa=True, kq_xoaluc=now)
+        )
+
+        await self.db.commit()
+
+    # ── Clear all history for a user (soft delete) ────
+    async def clear_history(self, user_id: int) -> int:
+        """
+        Soft-delete ALL history items of a user.
+        Returns the number of items deleted.
+        """
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        # Get IDs of vanban to delete
+        vb_ids_stmt = select(VanBan.vb_id).where(
+            VanBan.vb_tk_id == user_id,
+            VanBan.vb_xoa == False,  # noqa: E712
+        )
+        result = await self.db.execute(vb_ids_stmt)
+        vb_ids = [row[0] for row in result.all()]
+
+        if not vb_ids:
+            return 0
+
+        # Soft-delete vanban
+        await self.db.execute(
+            update(VanBan)
+            .where(VanBan.vb_id.in_(vb_ids))
+            .values(vb_xoa=True, vb_xoaluc=now)
+        )
+
+        # Soft-delete related ketqua
+        await self.db.execute(
+            update(KetQua)
+            .where(KetQua.kq_vb_id.in_(vb_ids), KetQua.kq_xoa == False)  # noqa: E712
+            .values(kq_xoa=True, kq_xoaluc=now)
+        )
+
+        await self.db.commit()
+        return len(vb_ids)

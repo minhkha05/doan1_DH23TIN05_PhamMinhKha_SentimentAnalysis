@@ -13,6 +13,7 @@ from app.core.database import get_db
 from app.dependencies import require_admin
 from app.models.models import CamXuc, TaiKhoan
 from app.schemas.schemas import (
+    AdminTextItem,
     AdminUserItem,
     DashboardStats,
     ExportItem,
@@ -22,6 +23,7 @@ from app.schemas.schemas import (
     LabelUpdateResponse,
     PaginatedResponse,
     SuccessResponse,
+    UpdatePhoneRequest,
     UpdateRoleRequest,
     UpdateUserStatusRequest,
 )
@@ -126,6 +128,47 @@ async def update_user_status(
 
 
 # ══════════════════════════════════════════════════════════
+# DELETE /users/{user_id} – Soft-delete user
+# ══════════════════════════════════════════════════════════
+
+@router.delete(
+    "/users/{user_id}",
+    response_model=SuccessResponse,
+    summary="Xóa tài khoản",
+    description="Soft-delete tài khoản người dùng và toàn bộ dữ liệu liên quan.",
+)
+async def delete_user(
+    user_id: int,
+    admin: TaiKhoan = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AdminService(db)
+    await service.delete_user(user_id=user_id)
+    return SuccessResponse(message="Đã xóa tài khoản.")
+
+
+# ══════════════════════════════════════════════════════════
+# PUT /users/{user_id}/phone – Admin update user's phone
+# ══════════════════════════════════════════════════════════
+
+@router.put(
+    "/users/{user_id}/phone",
+    response_model=SuccessResponse,
+    summary="Cập nhật SĐT người dùng",
+    description="Admin cập nhật số điện thoại cho người dùng.",
+)
+async def update_user_phone(
+    user_id: int,
+    body: UpdatePhoneRequest,
+    admin: TaiKhoan = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AdminService(db)
+    result = await service.update_user_phone(user_id=user_id, new_sdt=body.sdt)
+    return SuccessResponse(message="Đã cập nhật số điện thoại.", data=result)
+
+
+# ══════════════════════════════════════════════════════════
 # GET /labels – List all labels for review
 # ══════════════════════════════════════════════════════════
 
@@ -208,8 +251,57 @@ async def export_data(
     )
 
 
-# ══════════════════════════════════════════════════════════
-# GET /models – List available AI models
+# ══════════════════════════════════════════════════════════# GET /texts – Admin manage all texts
+# ════════════════════════════════════════════════════════
+
+@router.get(
+    "/texts",
+    response_model=PaginatedResponse[AdminTextItem],
+    summary="Quản lý văn bản",
+    description="Liệt kê toàn bộ câu văn user đã nhập (phân trang, tìm kiếm).",
+)
+async def list_texts(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    search: str = Query(None, description="Tìm theo nội dung văn bản"),
+    admin: TaiKhoan = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AdminService(db)
+    items, total = await service.list_texts(
+        page=page, page_size=page_size, search=search,
+    )
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+    return PaginatedResponse[AdminTextItem](
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+        items=[AdminTextItem(**item) for item in items],
+    )
+
+
+# ════════════════════════════════════════════════════════
+# DELETE /texts/{vb_id} – Admin xóa văn bản rác
+# ════════════════════════════════════════════════════════
+
+@router.delete(
+    "/texts/{vb_id}",
+    response_model=SuccessResponse,
+    summary="Xóa văn bản",
+    description="Admin soft-delete một văn bản rác.",
+)
+async def delete_text(
+    vb_id: int,
+    admin: TaiKhoan = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AdminService(db)
+    await service.delete_text(vb_id=vb_id)
+    return SuccessResponse(message="Đã xóa văn bản.")
+
+
+# ════════════════════════════════════════════════════════# GET /models – List available AI models
 # ══════════════════════════════════════════════════════════
 
 @router.get(

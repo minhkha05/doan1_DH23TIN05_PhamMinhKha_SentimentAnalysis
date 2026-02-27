@@ -18,6 +18,7 @@ import {
     HiOutlineMoon,
     HiOutlineBars3,
     HiOutlineXMark,
+    HiOutlineDocumentText,
 } from 'react-icons/hi2';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -48,6 +49,7 @@ const Sidebar: React.FC = () => {
     const adminLinks = [
         { to: '/admin/dashboard', icon: <HiOutlineChartBar />, label: 'Dashboard' },
         { to: '/admin/users', icon: <HiOutlineUsers />, label: 'Người dùng' },
+        { to: '/admin/texts', icon: <HiOutlineDocumentText />, label: 'Văn bản' },
         { to: '/admin/labels', icon: <HiOutlineTag />, label: 'Nhãn cảm xúc' },
         { to: '/admin/test-model', icon: <HiOutlineBeaker />, label: 'Test Model' },
         { to: '/admin/export', icon: <HiOutlineArrowDownTray />, label: 'Xuất dữ liệu' },
