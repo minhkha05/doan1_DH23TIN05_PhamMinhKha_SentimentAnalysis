@@ -194,7 +194,7 @@ class AdminService:
         if not user:
             raise NotFoundException(detail=f"Không tìm thấy tài khoản ID={user_id}.")
         user.tk_vaitro = VaiTroModel(new_role)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(user)
         return {
             "tk_id": user.tk_id,
@@ -210,7 +210,7 @@ class AdminService:
             raise NotFoundException(detail=f"Không tìm thấy tài khoản ID={user_id}.")
         user.tk_xoa = xoa
         user.tk_xoaluc = datetime.now(timezone.utc).replace(tzinfo=None) if xoa else None
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(user)
         return {
             "tk_id": user.tk_id,
@@ -249,8 +249,6 @@ class AdminService:
                 .values(kq_xoa=True, kq_xoaluc=now)
             )
 
-        await self.db.commit()
-
     async def update_user_phone(self, user_id: int, new_sdt: str) -> dict:
         """Admin updates a user's phone number."""
         from sqlalchemy import or_
@@ -273,7 +271,7 @@ class AdminService:
                 raise ConflictException(detail="Số điện thoại đã được sử dụng bởi tài khoản khác.")
 
         user.tk_sdt = new_sdt if new_sdt else None
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(user)
         return {"tk_id": user.tk_id, "tk_sdt": user.tk_sdt}
 
@@ -450,8 +448,6 @@ class AdminService:
             .where(KetQua.kq_vb_id == vb_id, KetQua.kq_xoa == False)  # noqa: E712
             .values(kq_xoa=True, kq_xoaluc=now)
         )
-
-        await self.db.commit()
 
     # ══════════════════════════════════════════════════════
     # Smart Data Export – COALESCE(suanhan.camxuc, ketqua.camxuc)

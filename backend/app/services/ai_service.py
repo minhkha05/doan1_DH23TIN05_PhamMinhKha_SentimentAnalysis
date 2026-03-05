@@ -91,8 +91,112 @@ def list_available_models() -> list[dict]:
                             "val_accuracy", "train_loss", "val_loss"]:
                     if key in tcfg:
                         model_info[key] = tcfg[key]
+
+                # Support nested format: {"results": {...}, "training": {...}, "data": {...}}
+                results_cfg = tcfg.get("results", {}) if isinstance(tcfg, dict) else {}
+                if isinstance(results_cfg, dict):
+                    if "test_accuracy" in results_cfg and "test_accuracy" not in model_info:
+                        model_info["test_accuracy"] = results_cfg["test_accuracy"]
+                    if "test_f1_macro" in results_cfg and "f1_score" not in model_info:
+                        model_info["f1_score"] = results_cfg["test_f1_macro"]
+                    if "test_precision" in results_cfg and "precision" not in model_info:
+                        model_info["precision"] = results_cfg["test_precision"]
+                    if "test_recall" in results_cfg and "recall" not in model_info:
+                        model_info["recall"] = results_cfg["test_recall"]
+
+                training_cfg = tcfg.get("training", {}) if isinstance(tcfg, dict) else {}
+                if isinstance(training_cfg, dict):
+                    if "epochs" in training_cfg and "epochs" not in model_info:
+                        model_info["epochs"] = training_cfg["epochs"]
+                    if "batch_size" in training_cfg and "batch_size" not in model_info:
+                        model_info["batch_size"] = training_cfg["batch_size"]
+                    if "lr" in training_cfg and "learning_rate" not in model_info:
+                        model_info["learning_rate"] = training_cfg["lr"]
+
+                data_cfg = tcfg.get("data", {}) if isinstance(tcfg, dict) else {}
+                if isinstance(data_cfg, dict):
+                    if "train" in data_cfg and "train_samples" not in model_info:
+                        model_info["train_samples"] = data_cfg["train"]
+                    if "val" in data_cfg and "val_samples" not in model_info:
+                        model_info["val_samples"] = data_cfg["val"]
+
+                # Normalize alternative metric keys
+                if "test_f1_macro" in tcfg and "f1_score" not in model_info:
+                    model_info["f1_score"] = tcfg["test_f1_macro"]
+                if "test_precision_macro" in tcfg and "precision" not in model_info:
+                    model_info["precision"] = tcfg["test_precision_macro"]
+                if "test_recall_macro" in tcfg and "recall" not in model_info:
+                    model_info["recall"] = tcfg["test_recall_macro"]
             except Exception:
                 pass
+
+        # Read alternative metrics files (for v5 / TF-IDF-SVM / custom training scripts)
+        for metrics_name in ["metrics_v5.json", "metrics_tfidf_svm.json", "metrics.json"]:
+            metrics_path = entry / metrics_name
+            if not metrics_path.exists():
+                continue
+            try:
+                with open(metrics_path, "r", encoding="utf-8") as f:
+                    mcfg = json.load(f)
+
+                if model_info.get("version") in (None, "N/A") and "version" in mcfg:
+                    model_info["version"] = mcfg["version"]
+
+                # Unified metrics mapping
+                if "accuracy" in mcfg:
+                    model_info["accuracy"] = mcfg["accuracy"]
+                if "test_accuracy" in mcfg and "test_accuracy" not in model_info:
+                    model_info["test_accuracy"] = mcfg["test_accuracy"]
+                if "f1_score" in mcfg:
+                    model_info["f1_score"] = mcfg["f1_score"]
+                if "precision" in mcfg:
+                    model_info["precision"] = mcfg["precision"]
+                if "recall" in mcfg:
+                    model_info["recall"] = mcfg["recall"]
+
+                if "test_f1_macro" in mcfg and "f1_score" not in model_info:
+                    model_info["f1_score"] = mcfg["test_f1_macro"]
+                if "test_precision_macro" in mcfg and "precision" not in model_info:
+                    model_info["precision"] = mcfg["test_precision_macro"]
+                if "test_recall_macro" in mcfg and "recall" not in model_info:
+                    model_info["recall"] = mcfg["test_recall_macro"]
+
+                for key in ["epochs", "learning_rate", "batch_size", "train_samples", "val_samples", "train_loss", "val_loss"]:
+                    if key in mcfg and key not in model_info:
+                        model_info[key] = mcfg[key]
+            except Exception:
+                pass
+
+        # Backward compatibility: some old configs store eval metrics in config.json
+        if config_path.exists():
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    cfg2 = json.load(f)
+                eval_metrics = cfg2.get("eval") if isinstance(cfg2, dict) else None
+                if isinstance(eval_metrics, dict):
+                    if "acc" in eval_metrics and "test_accuracy" not in model_info:
+                        model_info["test_accuracy"] = eval_metrics["acc"]
+                    if "f1" in eval_metrics and "f1_score" not in model_info:
+                        model_info["f1_score"] = eval_metrics["f1"]
+            except Exception:
+                pass
+
+        # Fallbacks so frontend can always render useful values
+        if model_info.get("accuracy") is None and model_info.get("test_accuracy") is not None:
+            model_info["accuracy"] = model_info["test_accuracy"]
+
+        # Traditional TF-IDF + SVM models are also 3-class in this project.
+        if (not model_info.get("num_labels") or model_info.get("num_labels") == 0) and (
+            entry.name.lower().startswith("tf_idf")
+            or "tfidf" in entry.name.lower()
+        ):
+            model_info["num_labels"] = 3
+
+        if model_info.get("version") in (None, "N/A"):
+            if entry.name.lower().startswith("phobert-"):
+                model_info["version"] = entry.name.replace("phobert-", "").upper()
+            elif entry.name.lower().startswith("tf_idf"):
+                model_info["version"] = "TF-IDF"
 
         results.append(model_info)
     return results

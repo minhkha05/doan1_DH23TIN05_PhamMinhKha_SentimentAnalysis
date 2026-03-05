@@ -6,7 +6,6 @@ import {
     HiOutlineCpuChip,
     HiOutlineCheckCircle,
     HiOutlineStar,
-    HiOutlineInformationCircle,
     HiOutlineChartBar,
 } from 'react-icons/hi2';
 import { adminService, type ModelInfo } from '../../services/adminService';
@@ -47,7 +46,7 @@ const TestModelPage: React.FC = () => {
     const [settingActive, setSettingActive] = useState(false);
 
     const [showConfirm, setShowConfirm] = useState(false);
-    const [showDetails, setShowDetails] = useState(true);
+    const [showCompare, setShowCompare] = useState(true);
 
     useEffect(() => {
         fetchModels();
@@ -107,8 +106,6 @@ const TestModelPage: React.FC = () => {
         }
     };
 
-    const currentModelInfo = models.find((m) => m.name === selectedModel);
-
     return (
         <div className="admin-page">
             <div className="admin-page-header animate-fade-in-down">
@@ -167,122 +164,54 @@ const TestModelPage: React.FC = () => {
                 )}
             </div>
 
-            {currentModelInfo && (
-                <div className="model-details glass-card-static animate-fade-in-up stagger-2">
+            {models.length > 1 && (
+                <div className="model-compare glass-card-static animate-fade-in-up stagger-3">
                     <div className="model-details-header">
-                        <div className="model-details-title">
-                            <HiOutlineInformationCircle size={20} />
-                            <h3>Chi tiết mô hình: {currentModelInfo.name}</h3>
-                        </div>
-                        <button className="btn btn-ghost btn-sm" onClick={() => setShowDetails(!showDetails)}>
-                            {showDetails ? 'Thu gọn' : 'Mở rộng'}
+                        <h3><HiOutlineChartBar size={18} /> So sánh mô hình</h3>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setShowCompare(!showCompare)}>
+                            {showCompare ? 'Thu gọn' : 'Mở rộng'}
                         </button>
                     </div>
 
-                    {showDetails && (
-                        <div className="model-details-content">
-                            <div className="model-specs-grid">
-                                <div className="model-spec-item">
-                                    <span className="model-spec-label">Phiên bản</span>
-                                    <span className="model-spec-value">{currentModelInfo.version || 'N/A'}</span>
-                                </div>
-                                <div className="model-spec-item">
-                                    <span className="model-spec-label">Số nhãn</span>
-                                    <span className="model-spec-value">{currentModelInfo.num_labels || 'N/A'}</span>
-                                </div>
-                            </div>
-
-                            <div className="model-metrics-section">
-                                <h4><HiOutlineChartBar size={16} /> Chỉ số chính</h4>
-                                <div className="model-metrics-grid">
-                                    <div className="model-metric-card">
-                                        <span className="model-metric-value">
-                                            {currentModelInfo.accuracy
-                                                ? `${(currentModelInfo.accuracy * 100).toFixed(2)}%`
-                                                : currentModelInfo.test_accuracy
-                                                    ? `${(currentModelInfo.test_accuracy * 100).toFixed(2)}%`
-                                                    : 'N/A'}
-                                        </span>
-                                        <span className="model-metric-label">Accuracy</span>
-                                    </div>
-
-                                    <div className="model-metric-card">
-                                        <span className="model-metric-value">
-                                            {currentModelInfo.f1_score
-                                                ? `${(currentModelInfo.f1_score * 100).toFixed(2)}%`
-                                                : 'N/A'}
-                                        </span>
-                                        <span className="model-metric-label">F1-Score</span>
-                                    </div>
-
-                                    <div className="model-metric-card">
-                                        <span className="model-metric-value">
-                                            {currentModelInfo.precision
-                                                ? `${(currentModelInfo.precision * 100).toFixed(2)}%`
-                                                : 'N/A'}
-                                        </span>
-                                        <span className="model-metric-label">Precision</span>
-                                    </div>
-
-                                    <div className="model-metric-card">
-                                        <span className="model-metric-value">
-                                            {currentModelInfo.recall
-                                                ? `${(currentModelInfo.recall * 100).toFixed(2)}%`
-                                                : 'N/A'}
-                                        </span>
-                                        <span className="model-metric-label">Recall</span>
-                                    </div>
-                                </div>
-                            </div>
+                    {showCompare && (
+                        <div className="model-compare-table-wrapper">
+                            <table className="table model-compare-table">
+                                <thead>
+                                    <tr>
+                                        <th>Mô hình</th>
+                                        <th>Số nhãn</th>
+                                        <th>Phiên bản</th>
+                                        <th>Accuracy</th>
+                                        <th>F1</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {models.map((model) => (
+                                        <tr key={model.name} className={model.name === selectedModel ? 'model-compare-selected' : ''}>
+                                            <td>
+                                                <div className="model-compare-name">
+                                                    {model.name}
+                                                    {model.name === activeModel && <span className="model-compare-star">⭐</span>}
+                                                </div>
+                                            </td>
+                                            <td>{model.num_labels || '—'}</td>
+                                            <td>{model.version}</td>
+                                            <td className="admin-td-confidence">
+                                                {model.accuracy
+                                                    ? `${(model.accuracy * 100).toFixed(2)}%`
+                                                    : model.test_accuracy
+                                                        ? `${(model.test_accuracy * 100).toFixed(2)}%`
+                                                        : '—'}
+                                            </td>
+                                            <td className="admin-td-confidence">
+                                                {model.f1_score ? `${(model.f1_score * 100).toFixed(2)}%` : '—'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     )}
-                </div>
-            )}
-
-            {models.length > 1 && (
-                <div className="model-compare glass-card-static animate-fade-in-up stagger-3">
-                    <h3><HiOutlineChartBar size={18} /> So sánh mô hình</h3>
-                    <div className="model-compare-table-wrapper">
-                        <table className="table model-compare-table">
-                            <thead>
-                                <tr>
-                                    <th>Mô hình</th>
-                                    <th>Số nhãn</th>
-                                    <th>Hidden Size</th>
-                                    <th>Layers</th>
-                                    <th>Phiên bản</th>
-                                    <th>Accuracy</th>
-                                    <th>F1</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {models.map((model) => (
-                                    <tr key={model.name} className={model.name === selectedModel ? 'model-compare-selected' : ''}>
-                                        <td>
-                                            <div className="model-compare-name">
-                                                {model.name}
-                                                {model.name === activeModel && <span className="model-compare-star">⭐</span>}
-                                            </div>
-                                        </td>
-                                        <td>{model.num_labels || '—'}</td>
-                                        <td>{model.hidden_size || '—'}</td>
-                                        <td>{model.num_hidden_layers || '—'}</td>
-                                        <td>{model.version}</td>
-                                        <td className="admin-td-confidence">
-                                            {model.accuracy
-                                                ? `${(model.accuracy * 100).toFixed(2)}%`
-                                                : model.test_accuracy
-                                                    ? `${(model.test_accuracy * 100).toFixed(2)}%`
-                                                    : '—'}
-                                        </td>
-                                        <td className="admin-td-confidence">
-                                            {model.f1_score ? `${(model.f1_score * 100).toFixed(2)}%` : '—'}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
                 </div>
             )}
 

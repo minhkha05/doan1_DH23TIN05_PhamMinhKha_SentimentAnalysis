@@ -9,6 +9,7 @@ import {
     HiOutlineLockClosed,
     HiOutlineArrowLeft,
     HiOutlineKey,
+    HiOutlineCheckCircle,
     HiOutlineEye,
     HiOutlineEyeSlash,
 } from 'react-icons/hi2';
@@ -265,7 +266,9 @@ const ForgotPasswordPage: React.FC = () => {
                     {/* Step 4: Done */}
                     {step === 'done' && (
                         <div className="auth-form" style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '4rem', marginBottom: 'var(--space-4)' }}>✅</div>
+                            <div style={{ marginBottom: 'var(--space-4)', color: 'var(--success, #22c55e)' }}>
+                                <HiOutlineCheckCircle size={72} />
+                            </div>
                             <button className="btn btn-primary btn-lg auth-submit" onClick={() => navigate('/login')}>
                                 Đăng nhập ngay
                             </button>

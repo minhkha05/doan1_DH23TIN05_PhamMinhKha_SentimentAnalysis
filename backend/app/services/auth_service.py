@@ -153,7 +153,7 @@ class AuthService:
                 raise ConflictException(detail="Số điện thoại đã được sử dụng bởi tài khoản khác.")
 
         user.tk_sdt = new_sdt if new_sdt else None
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(user)
         return {"tk_id": user.tk_id, "tk_sdt": user.tk_sdt}
 
@@ -174,4 +174,4 @@ class AuthService:
             raise BadRequestException(detail="Mật khẩu hiện tại không chính xác.")
 
         user.tk_matkhau = hash_password(new_password)
-        await self.db.commit()
+        await self.db.flush()
