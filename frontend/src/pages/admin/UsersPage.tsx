@@ -230,7 +230,7 @@ const UsersPage: React.FC = () => {
                                             </td>
                                             <td>
                                                 <span className={`badge ${u.tk_xoa ? 'badge-negative' : 'badge-positive'}`}>
-                                                    {u.tk_xoa ? '🔒 Đã khóa' : '✅ Hoạt động'}
+                                                    {u.tk_xoa ? 'Đã khóa' : 'Hoạt động'}
                                                 </span>
                                             </td>
                                             <td className="admin-td-confidence">{u.tong_vanban}</td>
@@ -257,7 +257,7 @@ const UsersPage: React.FC = () => {
                                                     {/* Lock/Unlock */}
                                                     {!isSelf && (
                                                         <button
-                                                            className={`btn btn-sm ${u.tk_xoa ? 'btn-ghost' : 'btn-ghost users-btn-danger'}`}
+                                                            className={`btn btn-sm ${u.tk_xoa ? 'btn-ghost users-btn-lock' : 'btn-ghost users-btn-lock'}`}
                                                             title={u.tk_xoa ? 'Mở khóa' : 'Khóa tài khoản'}
                                                             onClick={() => setConfirmAction({
                                                                 type: u.tk_xoa ? 'unlock' : 'lock',
@@ -267,14 +267,17 @@ const UsersPage: React.FC = () => {
                                                                     : `Khóa tài khoản ${u.tk_email || u.tk_sdt}?`,
                                                             })}
                                                         >
-                                                            {u.tk_xoa ? <HiOutlineLockOpen size={16} /> : <HiOutlineLockClosed size={16} />}
+                                                            {u.tk_xoa ? 
+                                                                <HiOutlineLockOpen size={18} className="users-icon-lock" /> : 
+                                                                <HiOutlineLockClosed size={18} className="users-icon-lock" />
+                                                            }
                                                         </button>
                                                     )}
 
                                                     {/* Delete */}
                                                     {!isSelf && (
                                                         <button
-                                                            className="btn btn-sm btn-ghost users-btn-danger"
+                                                            className="btn btn-sm btn-ghost users-btn-delete"
                                                             title="Xóa tài khoản"
                                                             onClick={() => setConfirmAction({
                                                                 type: 'delete',
@@ -282,7 +285,7 @@ const UsersPage: React.FC = () => {
                                                                 label: `Xóa vĩnh viễn tài khoản ${u.tk_email || u.tk_sdt}? Toàn bộ dữ liệu liên quan sẽ bị xóa.`,
                                                             })}
                                                         >
-                                                            <HiOutlineTrash size={16} />
+                                                            <HiOutlineTrash size={18} className="users-icon-delete" />
                                                         </button>
                                                     )}
                                                 </div>

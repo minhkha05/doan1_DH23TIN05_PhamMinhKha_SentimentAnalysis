@@ -155,8 +155,6 @@ class AnalysisService:
             .values(kq_xoa=True, kq_xoaluc=now)
         )
 
-        await self.db.commit()
-
     # ── Clear all history for a user (soft delete) ────
     async def clear_history(self, user_id: int) -> int:
         """
@@ -190,5 +188,4 @@ class AnalysisService:
             .values(kq_xoa=True, kq_xoaluc=now)
         )
 
-        await self.db.commit()
         return len(vb_ids)
