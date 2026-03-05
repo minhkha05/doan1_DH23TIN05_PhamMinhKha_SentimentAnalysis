@@ -1,10 +1,12 @@
-# ═══════════════════════════════════════════════
-#  AI Sentiment Analysis — .gitignore
-#  DH23TIN05 — Phạm Minh Kha
-# ═══════════════════════════════════════════════
+# AI Sentiment Analysis — .gitignore
+# Project: DO_AN_1 - Sentiment Analysis
 
 # ── AI Models (quá nặng để push lên GitHub) ──
 models/
+
+# ── SQL exports / local DB dumps (không push) ──
+# File: PostgreSQL AI Sentiment_Vietnamese.sql
+PostgreSQL AI Sentiment_Vietnamese.sql
 
 # ── Backend: Môi trường ảo Python ─────────────
 venv/
