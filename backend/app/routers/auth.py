@@ -4,10 +4,15 @@ Endpoints: register, login, profile, forgot-password, verify-reset-code, reset-p
 """
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException
+from urllib.parse import urlencode
+
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.dependencies import get_current_user
 from app.models.models import TaiKhoan
@@ -185,3 +190,92 @@ async def reset_password(
     consume_code(email)
 
     return {"message": "Đặt lại mật khẩu thành công."}
+
+
+# ══════════════════════════════════════════════════════════
+# GET /google/login
+# ══════════════════════════════════════════════════════════
+
+@router.get(
+    "/google/login",
+    summary="Đăng nhập bằng Google",
+    description="Redirect đến Google OAuth để đăng nhập.",
+)
+async def google_login():
+    settings = get_settings()
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(status_code=500, detail="Google OAuth chưa được cấu hình trên server.")
+
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "online",
+        "prompt": "select_account",
+    }
+    authorization_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    return RedirectResponse(authorization_url)
+
+
+# ══════════════════════════════════════════════════════════
+# GET /google/callback
+# ══════════════════════════════════════════════════════════
+
+@router.get(
+    "/google/callback",
+    summary="Google OAuth callback",
+    description="Xử lý callback từ Google OAuth.",
+)
+async def google_callback(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    settings = get_settings()
+    code = request.query_params.get("code")
+    if not code:
+        error = request.query_params.get("error", "unknown_error")
+        raise HTTPException(status_code=400, detail=f"Google OAuth error: {error}")
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        token_resp = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+                "grant_type": "authorization_code",
+            },
+        )
+        if token_resp.status_code != 200:
+            raise HTTPException(status_code=400, detail="Không thể lấy access token từ Google.")
+
+        access_token = token_resp.json().get("access_token")
+        if not access_token:
+            raise HTTPException(status_code=400, detail="Google không trả về access token hợp lệ.")
+
+        userinfo_resp = await client.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if userinfo_resp.status_code != 200:
+            raise HTTPException(status_code=400, detail="Không thể lấy thông tin người dùng từ Google.")
+
+        user_info = userinfo_resp.json()
+
+    google_id = user_info.get("id")
+    if not google_id:
+        raise HTTPException(status_code=400, detail="Google không trả về định danh người dùng.")
+
+    email = user_info.get("email")
+    name = user_info.get("name")
+
+    # Authenticate or create user
+    service = AuthService(db)
+    result = await service.google_login(google_id, email, name)
+
+    frontend_url = f"{settings.FRONTEND_URL.rstrip('/')}/auth/callback"
+    return RedirectResponse(
+        f"{frontend_url}?token={result['access_token']}&token_type={result['token_type']}&vaitro={result['vaitro']}&tk_id={result['tk_id']}"
+    )

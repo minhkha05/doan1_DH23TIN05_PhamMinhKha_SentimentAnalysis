@@ -14,6 +14,7 @@ import {
     HiOutlineFaceSmile,
     HiOutlineFaceFrown,
     HiOutlineMinusCircle,
+    HiOutlineEye,
 } from 'react-icons/hi2';
 import { adminService } from '../../services/adminService';
 import type { AdminTextItem, CamXuc } from '../../types';
@@ -39,6 +40,8 @@ const TextsPage: React.FC = () => {
 
     // Confirm dialog
     const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+    // View dialog
+    const [viewText, setViewText] = useState<string | null>(null);
 
     const fetchTexts = useCallback(async () => {
         setLoading(true);
@@ -89,7 +92,7 @@ const TextsPage: React.FC = () => {
     };
 
     return (
-        <div className="admin-page">
+        <div className="admin-page texts-page">
             <div className="admin-page-header animate-fade-in-down">
                 <h1><HiOutlineDocumentText /> Quản lý văn bản</h1>
                 <p>Tổng cộng <strong>{total}</strong> văn bản — Tìm kiếm, xem và xóa văn bản rác</p>
@@ -168,14 +171,21 @@ const TextsPage: React.FC = () => {
                                             </td>
                                             <td className="admin-td-date">{formatDate(item.vb_taoluc)}</td>
                                             <td>
-                                                <button
-                                                    className="btn btn-ghost btn-sm"
-                                                    style={{ color: 'var(--negative)' }}
-                                                    onClick={() => setConfirmDeleteId(item.vb_id)}
-                                                    title="Xóa văn bản"
-                                                >
-                                                    <HiOutlineTrash size={16} />
-                                                </button>
+                                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center', minHeight: '40px' }}>
+                                                    <button
+                                                        className="btn btn-ghost btn-sm"
+                                                        onClick={() => setViewText(item.noidung)}
+                                                        title="Xem chi tiết"
+                                                    >
+                                                        <HiOutlineEye size={18}  />
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-ghost btn-sm btn-delete" style={{ color: 'var(--negative)' }} onClick={() => setConfirmDeleteId(item.vb_id)}
+                                                        title="Xóa văn bản"
+                                                    >
+                                                        <HiOutlineTrash size={18}  />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -227,6 +237,36 @@ const TextsPage: React.FC = () => {
                 </div>
             )}
 
+            {viewText !== null && (
+                <div className="confirm-overlay" onClick={() => setViewText(null)}>
+                    <div className="confirm-dialog" style={{ maxWidth: '600px', width: '90%' }} onClick={(e) => e.stopPropagation()}>
+                        <h3>Chi tiết nội dung</h3>
+                        <div style={{
+                            maxHeight: '400px',
+                            overflowY: 'auto',
+                            padding: '1rem',
+                            marginTop: '1rem',
+                            marginBottom: '1.5rem',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid var(--border-light)',
+                            borderRadius: '8px',
+                            lineHeight: '1.6',
+                            color: 'var(--text-primary)',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            textAlign: 'left'
+                        }}>
+                            {viewText}
+                        </div>
+                        <div className="confirm-actions">
+                            <button className="btn btn-primary" onClick={() => setViewText(null)}>
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ── Confirm Delete Dialog ─────────────── */}
             {confirmDeleteId !== null && (
                 <div className="confirm-overlay" onClick={() => setConfirmDeleteId(null)}>
@@ -253,3 +293,8 @@ const TextsPage: React.FC = () => {
 };
 
 export default TextsPage;
+
+
+
+
+

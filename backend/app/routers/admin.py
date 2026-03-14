@@ -5,8 +5,9 @@ All endpoints require admin role.
 """
 
 import math
+from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -14,9 +15,13 @@ from app.dependencies import require_admin
 from app.models.models import CamXuc, TaiKhoan
 from app.schemas.schemas import (
     AdminTextItem,
+    BatchAnalyzeItem,
+    BatchAnalyzeResponse,
     AdminUserItem,
     DashboardStats,
+    ExportHistoryItem,
     ExportItem,
+    ExportPreviewItem,
     ExportResponse,
     HistoryItem,
     LabelUpdateRequest,
@@ -28,6 +33,7 @@ from app.schemas.schemas import (
     UpdateUserStatusRequest,
 )
 from app.services.admin_service import AdminService
+from app.services.file_parser_service import extract_text_rows_from_upload
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
 
@@ -234,6 +240,10 @@ async def update_label(
 async def export_data(
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=1000),
+    start_date: date | None = Query(None, description="Ngày bắt đầu (YYYY-MM-DD)"),
+    end_date: date | None = Query(None, description="Ngày kết thúc (YYYY-MM-DD)"),
+    sentiment: CamXuc | None = Query(None, description="Lọc cảm xúc: negative | neutral | positive"),
+    model_ai: str | None = Query(None, description="Lọc theo model AI"),
     admin: TaiKhoan = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -242,12 +252,117 @@ async def export_data(
         admin_id=admin.tk_id,
         page=page,
         page_size=page_size,
+        start_date=start_date,
+        end_date=end_date,
+        sentiment=sentiment,
+        model_ai=model_ai,
     )
     return ExportResponse(
         xd_id=result["xd_id"],
         file=result["file"],
         sodong=result["sodong"],
         items=[ExportItem(**item) for item in result["items"]],
+    )
+
+
+@router.get(
+    "/export/preview",
+    response_model=PaginatedResponse[ExportPreviewItem],
+    summary="Preview dữ liệu export",
+    description="Xem trước dữ liệu sẽ export theo bộ lọc thời gian, cảm xúc, model.",
+)
+async def export_preview(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    start_date: date | None = Query(None, description="Ngày bắt đầu (YYYY-MM-DD)"),
+    end_date: date | None = Query(None, description="Ngày kết thúc (YYYY-MM-DD)"),
+    sentiment: CamXuc | None = Query(None, description="Lọc cảm xúc: negative | neutral | positive"),
+    model_ai: str | None = Query(None, description="Lọc theo model AI"),
+    admin: TaiKhoan = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    _ = admin
+    service = AdminService(db)
+    items, total = await service.get_export_preview(
+        page=page,
+        page_size=page_size,
+        start_date=start_date,
+        end_date=end_date,
+        sentiment=sentiment,
+        model_ai=model_ai,
+    )
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+    return PaginatedResponse[ExportPreviewItem](
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+        items=[ExportPreviewItem(**item) for item in items],
+    )
+
+
+@router.get(
+    "/export/download",
+    summary="Tải file dữ liệu xuất",
+    description=(
+        "Xuất dữ liệu theo khoảng thời gian từ vanban + ketqua + suanhan. "
+        "Ưu tiên nhãn ở suanhan, nếu chưa có thì dùng ketqua. "
+        "Hỗ trợ CSV hoặc Excel và ghi lịch sử vào xuatdulieu."
+    ),
+)
+async def export_download(
+    start_date: date | None = Query(None, description="Ngày bắt đầu (YYYY-MM-DD)"),
+    end_date: date | None = Query(None, description="Ngày kết thúc (YYYY-MM-DD)"),
+    sentiment: CamXuc | None = Query(None, description="Lọc cảm xúc: negative | neutral | positive"),
+    model_ai: str | None = Query(None, description="Lọc theo model AI"),
+    file_format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    admin: TaiKhoan = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AdminService(db)
+    result = await service.export_data_file(
+        admin_id=admin.tk_id,
+        file_format=file_format,
+        start_date=start_date,
+        end_date=end_date,
+        sentiment=sentiment,
+        model_ai=model_ai,
+    )
+
+    return Response(
+        content=result["payload"],
+        media_type=result["media_type"],
+        headers={
+            "Content-Disposition": f"attachment; filename={result['filename']}",
+            "X-Export-Id": str(result["xd_id"]),
+            "X-Export-File": result["filename"],
+            "X-Export-Rows": str(result["row_count"]),
+        },
+    )
+
+
+@router.get(
+    "/export/history",
+    response_model=PaginatedResponse[ExportHistoryItem],
+    summary="Thống kê lịch sử export",
+    description="Lấy bảng thống kê lịch sử export trực tiếp từ xuatdulieu.",
+)
+async def export_history(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    admin: TaiKhoan = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    _ = admin
+    service = AdminService(db)
+    items, total = await service.list_export_history(page=page, page_size=page_size)
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+    return PaginatedResponse[ExportHistoryItem](
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+        items=[ExportHistoryItem(**item) for item in items],
     )
 
 
@@ -322,6 +437,40 @@ async def list_models(
     }
 
 
+@router.post(
+    "/analyze-batch",
+    response_model=BatchAnalyzeResponse,
+    summary="Admin phân tích hàng loạt từ file",
+    description="Upload file .txt/.csv/.tsv và phân tích hàng loạt bằng model mặc định (không lưu DB).",
+)
+async def analyze_batch(
+    file: UploadFile = File(...),
+    admin: TaiKhoan = Depends(require_admin),
+):
+    from app.services.ai_service import predict_sentiment
+
+    texts = await extract_text_rows_from_upload(file)
+    items: list[BatchAnalyzeItem] = []
+    for idx, text in enumerate(texts, start=1):
+        prediction = await predict_sentiment(text)
+        items.append(
+            BatchAnalyzeItem(
+                index=idx,
+                noidung=text,
+                camxuc=prediction["camxuc"],
+                tincay=prediction["tincay"],
+                model=prediction["model"],
+            )
+        )
+
+    return BatchAnalyzeResponse(
+        total_rows=len(texts),
+        success_count=len(items),
+        failed_count=0,
+        items=items,
+    )
+
+
 # ══════════════════════════════════════════════════════════
 # POST /models/test – Test a specific model
 # ══════════════════════════════════════════════════════════
@@ -332,6 +481,46 @@ from pydantic import BaseModel as PydanticBaseModel
 class TestModelRequest(PydanticBaseModel):
     noidung: str
     model_name: str
+
+
+@router.post(
+    "/models/test-batch",
+    response_model=BatchAnalyzeResponse,
+    summary="Test model với file upload",
+    description="Upload file nhiều câu để test một model cụ thể (không lưu DB).",
+)
+async def test_model_batch(
+    file: UploadFile = File(...),
+    model_name: str = Form(...),
+    admin: TaiKhoan = Depends(require_admin),
+):
+    from app.services.ai_service import list_available_models, predict_sentiment
+    from app.core.exceptions import NotFoundException
+
+    model_names = [m["name"] for m in list_available_models()]
+    if model_name not in model_names:
+        raise NotFoundException(detail=f"Mô hình '{model_name}' không tồn tại.")
+
+    texts = await extract_text_rows_from_upload(file)
+    items: list[BatchAnalyzeItem] = []
+    for idx, text in enumerate(texts, start=1):
+        prediction = await predict_sentiment(text, model_name=model_name)
+        items.append(
+            BatchAnalyzeItem(
+                index=idx,
+                noidung=text,
+                camxuc=prediction["camxuc"],
+                tincay=prediction["tincay"],
+                model=prediction["model"],
+            )
+        )
+
+    return BatchAnalyzeResponse(
+        total_rows=len(texts),
+        success_count=len(items),
+        failed_count=0,
+        items=items,
+    )
 
 
 @router.post(

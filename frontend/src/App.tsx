@@ -17,6 +17,7 @@ import LoginPage from './pages/public/LoginPage';
 import RegisterPage from './pages/public/RegisterPage';
 import ForgotPasswordPage from './pages/public/ForgotPasswordPage';
 import FreeTrialPage from './pages/public/FreeTrialPage';
+import AuthCallbackPage from './pages/public/AuthCallbackPage';
 
 // User pages
 import HomePage from './pages/user/HomePage';
@@ -43,6 +44,7 @@ const App: React.FC = () => {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/try" element={<FreeTrialPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
             {/* ── Protected routes (user) ───────────── */}
             <Route

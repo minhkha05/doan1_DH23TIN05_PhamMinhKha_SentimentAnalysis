@@ -62,6 +62,25 @@ export interface AnalyzeResponse {
     data: KetQuaResponse;
 }
 
+export interface BatchAnalyzeItem {
+    index: number;
+    noidung: string;
+    camxuc: CamXuc | null;
+    tincay: number | null;
+    model: string | null;
+    vb_id?: number | null;
+    kq_id?: number | null;
+    error?: string | null;
+}
+
+export interface BatchAnalyzeResponse {
+    success: boolean;
+    total_rows: number;
+    success_count: number;
+    failed_count: number;
+    items: BatchAnalyzeItem[];
+}
+
 // ── History ───────────────────────────────────────
 export interface HistoryItem {
     vb_id: number;
@@ -104,6 +123,8 @@ export interface ExportItem {
     tincay: number | null;
     camxuc_suanhan: CamXuc | null;
     camxuc_final: CamXuc | null;
+    model_ai: string | null;
+    thoigian_phan_tich: string | null;
     vb_taoluc: string | null;
 }
 
@@ -113,6 +134,30 @@ export interface ExportResponse {
     file: string;
     sodong: number;
     items: ExportItem[];
+}
+
+export type ExportFileFormat = 'csv' | 'xlsx';
+
+export interface ExportDownloadMeta {
+    xd_id: number;
+    file: string;
+    sodong: number;
+}
+
+export interface ExportPreviewItem {
+    noidung: string;
+    camxuc: CamXuc | null;
+    tincay: number | null;
+    model_ai: string | null;
+    thoigian_phan_tich: string | null;
+}
+
+export interface ExportHistoryRow {
+    xd_id: number;
+    ten_file: string;
+    so_dong: number;
+    nguoi_xuat: string;
+    thoigian_xuat: string | null;
 }
 
 // ── Pagination ────────────────────────────────────

@@ -4,9 +4,10 @@ Admin service – dashboard stats, label correction, smart data export.
 
 import csv
 import io
-import os
-from datetime import datetime, timezone
-from typing import List, Tuple
+from datetime import date, datetime, time, timezone
+from typing import List, Literal, Tuple
+
+from openpyxl import Workbook
 
 from sqlalchemy import case, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -450,114 +451,221 @@ class AdminService:
         )
 
     # ══════════════════════════════════════════════════════
-    # Smart Data Export – COALESCE(suanhan.camxuc, ketqua.camxuc)
+    # Smart Data Export – preview, download, history
     # ══════════════════════════════════════════════════════
 
-    async def export_data(
+    def _build_export_query(
         self,
-        admin_id: int,
-        page: int = 1,
-        page_size: int = 100,
-    ) -> dict:
-        """
-        Export data with COALESCE logic:
-        Final label = suanhan.camxuc if corrected, else ketqua.camxuc.
-        Logs the export into xuatdulieu table.
-        """
-        # Build the smart query using subqueries
-        # Latest suanhan per vanban
-        latest_sn_subq = (
+        start_date: date | None = None,
+        end_date: date | None = None,
+        sentiment: CamXuc | None = None,
+        model_ai: str | None = None,
+    ):
+        """Build base export query with label priority and optional filters."""
+        latest_sn_ranked = (
             select(
-                SuaNhan.sn_vb_id,
-                SuaNhan.sn_camxuc,
+                SuaNhan.sn_vb_id.label("vb_id"),
+                SuaNhan.sn_camxuc.label("camxuc_suanhan"),
+                func.row_number()
+                .over(
+                    partition_by=SuaNhan.sn_vb_id,
+                    order_by=(SuaNhan.sn_lucgan.desc(), SuaNhan.sn_id.desc()),
+                )
+                .label("rn"),
             )
             .where(SuaNhan.sn_xoa == False)  # noqa: E712
-            .distinct(SuaNhan.sn_vb_id)
-            .order_by(SuaNhan.sn_vb_id, SuaNhan.sn_lucgan.desc())
+            .subquery("latest_sn_ranked")
+        )
+
+        latest_sn = (
+            select(
+                latest_sn_ranked.c.vb_id,
+                latest_sn_ranked.c.camxuc_suanhan,
+            )
+            .where(latest_sn_ranked.c.rn == 1)
             .subquery("latest_sn")
         )
 
-        # Subquery to get the first (latest) non-deleted ketqua per vanban
-        # This avoids duplicate rows when a vanban has multiple ketqua
-        first_kq_subq = (
+        latest_kq_ranked = (
             select(
-                KetQua.kq_vb_id,
-                func.min(KetQua.kq_id).label("first_kq_id"),
+                KetQua.kq_vb_id.label("vb_id"),
+                KetQua.kq_camxuc.label("camxuc_ai"),
+                KetQua.kq_tincay.label("tincay"),
+                KetQua.kq_model.label("model_ai"),
+                KetQua.kq_luclay.label("thoigian_phan_tich"),
+                func.row_number()
+                .over(
+                    partition_by=KetQua.kq_vb_id,
+                    order_by=(KetQua.kq_luclay.desc(), KetQua.kq_id.desc()),
+                )
+                .label("rn"),
             )
             .where(KetQua.kq_xoa == False)  # noqa: E712
-            .group_by(KetQua.kq_vb_id)
-            .subquery("first_kq")
+            .subquery("latest_kq_ranked")
         )
 
-        # Main query – JOIN only with the first ketqua per vanban to avoid duplicates
+        latest_kq = (
+            select(
+                latest_kq_ranked.c.vb_id,
+                latest_kq_ranked.c.camxuc_ai,
+                latest_kq_ranked.c.tincay,
+                latest_kq_ranked.c.model_ai,
+                latest_kq_ranked.c.thoigian_phan_tich,
+            )
+            .where(latest_kq_ranked.c.rn == 1)
+            .subquery("latest_kq")
+        )
+
+        final_sentiment = func.coalesce(
+            latest_sn.c.camxuc_suanhan,
+            latest_kq.c.camxuc_ai,
+        ).label("camxuc")
+
         stmt = (
             select(
-                VanBan.vb_id,
-                VanBan.vb_noidung,
-                KetQua.kq_camxuc,
-                KetQua.kq_tincay,
-                latest_sn_subq.c.sn_camxuc,
-                func.coalesce(
-                    latest_sn_subq.c.sn_camxuc,
-                    KetQua.kq_camxuc,
-                ).label("camxuc_final"),
-                VanBan.vb_taoluc,
+                VanBan.vb_noidung.label("noidung"),
+                final_sentiment,
+                latest_kq.c.tincay,
+                latest_kq.c.model_ai,
+                latest_kq.c.thoigian_phan_tich,
             )
-            .join(
-                first_kq_subq,
-                first_kq_subq.c.kq_vb_id == VanBan.vb_id,
-                isouter=True,
-            )
-            .join(
-                KetQua,
-                KetQua.kq_id == first_kq_subq.c.first_kq_id,
-                isouter=True,
-            )
-            .join(
-                latest_sn_subq,
-                latest_sn_subq.c.sn_vb_id == VanBan.vb_id,
-                isouter=True,
-            )
+            .select_from(VanBan)
+            .join(latest_kq, latest_kq.c.vb_id == VanBan.vb_id, isouter=True)
+            .join(latest_sn, latest_sn.c.vb_id == VanBan.vb_id, isouter=True)
             .where(
                 VanBan.vb_xoa == False,  # noqa: E712
+                latest_kq.c.thoigian_phan_tich.is_not(None),
             )
-            .order_by(VanBan.vb_id)
         )
 
-        # Count total (distinct vanban)
-        count_stmt = (
-            select(func.count())
-            .select_from(VanBan)
-            .where(VanBan.vb_xoa == False)  # noqa: E712
+        if start_date:
+            start_dt = datetime.combine(start_date, time.min)
+            stmt = stmt.where(latest_kq.c.thoigian_phan_tich >= start_dt)
+
+        if end_date:
+            end_dt = datetime.combine(end_date, time.max)
+            stmt = stmt.where(latest_kq.c.thoigian_phan_tich <= end_dt)
+
+        if sentiment:
+            stmt = stmt.where(final_sentiment == sentiment)
+
+        if model_ai:
+            stmt = stmt.where(latest_kq.c.model_ai == model_ai)
+
+        stmt = stmt.order_by(latest_kq.c.thoigian_phan_tich.desc(), VanBan.vb_id.desc())
+        return stmt
+
+    async def get_export_preview(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        sentiment: CamXuc | None = None,
+        model_ai: str | None = None,
+    ) -> Tuple[List[dict], int]:
+        """Get paginated preview rows based on export filters."""
+        base_stmt = self._build_export_query(
+            start_date=start_date,
+            end_date=end_date,
+            sentiment=sentiment,
+            model_ai=model_ai,
         )
+
+        count_stmt = select(func.count()).select_from(base_stmt.subquery("export_preview"))
         total = (await self.db.execute(count_stmt)).scalar() or 0
 
-        # Paginate
-        offset = (page - 1) * page_size
-        paginated_stmt = stmt.offset(offset).limit(page_size)
-        result = await self.db.execute(paginated_stmt)
-        rows = result.all()
-
-        items = []
-        for row in rows:
-            items.append(
-                {
-                    "vb_id": row.vb_id,
-                    "noidung": row.vb_noidung,
-                    "camxuc_ai": row.kq_camxuc,
-                    "tincay": row.kq_tincay,
-                    "camxuc_suanhan": row.sn_camxuc,
-                    "camxuc_final": row.camxuc_final,
-                    "vb_taoluc": row.vb_taoluc,
-                }
+        rows = (
+            await self.db.execute(
+                base_stmt.offset((page - 1) * page_size).limit(page_size)
             )
+        ).all()
 
-        # Log the export
-        filename = f"export_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
+        items = [
+            {
+                "noidung": row.noidung,
+                "camxuc": row.camxuc,
+                "tincay": row.tincay,
+                "model_ai": row.model_ai,
+                "thoigian_phan_tich": row.thoigian_phan_tich,
+            }
+            for row in rows
+        ]
+
+        return items, total
+
+    async def export_data_file(
+        self,
+        admin_id: int,
+        file_format: Literal["csv", "xlsx"],
+        start_date: date | None = None,
+        end_date: date | None = None,
+        sentiment: CamXuc | None = None,
+        model_ai: str | None = None,
+    ) -> dict:
+        """Create export file bytes and save export history."""
+        rows = (
+            await self.db.execute(
+                self._build_export_query(
+                    start_date=start_date,
+                    end_date=end_date,
+                    sentiment=sentiment,
+                    model_ai=model_ai,
+                )
+            )
+        ).all()
+
+        now = datetime.now(timezone.utc)
+        filename = f"export_{now.strftime('%Y%m%d_%H%M%S')}.{file_format}"
+
+        headers = [
+            "Noi dung van ban",
+            "Cam xuc",
+            "Do tin cay",
+            "Model AI",
+            "Thoi gian phan tich",
+        ]
+
+        if file_format == "csv":
+            buffer = io.StringIO()
+            writer = csv.writer(buffer)
+            writer.writerow(headers)
+            for row in rows:
+                writer.writerow(
+                    [
+                        row.noidung or "",
+                        row.camxuc.value if row.camxuc else "",
+                        row.tincay,
+                        row.model_ai or "",
+                        row.thoigian_phan_tich.isoformat() if row.thoigian_phan_tich else "",
+                    ]
+                )
+            payload = ("\ufeff" + buffer.getvalue()).encode("utf-8")
+            media_type = "text/csv; charset=utf-8"
+        else:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Export"
+            ws.append(headers)
+            for row in rows:
+                ws.append(
+                    [
+                        row.noidung or "",
+                        row.camxuc.value if row.camxuc else "",
+                        row.tincay,
+                        row.model_ai or "",
+                        row.thoigian_phan_tich.replace(tzinfo=None) if row.thoigian_phan_tich else None,
+                    ]
+                )
+            stream = io.BytesIO()
+            wb.save(stream)
+            payload = stream.getvalue()
+            media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
         xuat = XuatDuLieu(
             xd_tk_id=admin_id,
             xd_file=filename,
-            xd_sodong=len(items),
+            xd_sodong=len(rows),
         )
         self.db.add(xuat)
         await self.db.flush()
@@ -565,6 +673,98 @@ class AdminService:
 
         return {
             "xd_id": xuat.xd_id,
+            "filename": filename,
+            "row_count": len(rows),
+            "payload": payload,
+            "media_type": media_type,
+        }
+
+    async def list_export_history(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> Tuple[List[dict], int]:
+        """Get export history from xuatdulieu for admin monitoring."""
+        count_stmt = (
+            select(func.count())
+            .select_from(XuatDuLieu)
+            .where(XuatDuLieu.xd_xoa == False)  # noqa: E712
+        )
+        total = (await self.db.execute(count_stmt)).scalar() or 0
+
+        stmt = (
+            select(
+                XuatDuLieu.xd_id,
+                XuatDuLieu.xd_file,
+                XuatDuLieu.xd_sodong,
+                XuatDuLieu.xd_taoluc,
+                TaiKhoan.tk_email,
+                TaiKhoan.tk_sdt,
+            )
+            .join(TaiKhoan, TaiKhoan.tk_id == XuatDuLieu.xd_tk_id, isouter=True)
+            .where(XuatDuLieu.xd_xoa == False)  # noqa: E712
+            .order_by(XuatDuLieu.xd_taoluc.desc(), XuatDuLieu.xd_id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+
+        rows = (await self.db.execute(stmt)).all()
+        items = [
+            {
+                "xd_id": row.xd_id,
+                "ten_file": row.xd_file,
+                "so_dong": row.xd_sodong or 0,
+                "nguoi_xuat": row.tk_email or row.tk_sdt or f"tk_{row.xd_id}",
+                "thoigian_xuat": row.xd_taoluc,
+            }
+            for row in rows
+        ]
+
+        return items, total
+
+    async def export_data(
+        self,
+        admin_id: int,
+        page: int = 1,
+        page_size: int = 100,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        sentiment: CamXuc | None = None,
+        model_ai: str | None = None,
+    ) -> dict:
+        """
+        Legacy response for export preview compatibility.
+        This endpoint returns paginated preview items and does not write history.
+        """
+        _ = admin_id
+        preview_items, total = await self.get_export_preview(
+            page=page,
+            page_size=page_size,
+            start_date=start_date,
+            end_date=end_date,
+            sentiment=sentiment,
+            model_ai=model_ai,
+        )
+
+        items = [
+            {
+                "vb_id": (page - 1) * page_size + idx,
+                "noidung": row["noidung"],
+                "camxuc_ai": row["camxuc"],
+                "tincay": row["tincay"],
+                "camxuc_suanhan": None,
+                "camxuc_final": row["camxuc"],
+                "model_ai": row["model_ai"],
+                "thoigian_phan_tich": row["thoigian_phan_tich"],
+                "vb_taoluc": row["thoigian_phan_tich"],
+            }
+            for idx, row in enumerate(preview_items, start=1)
+        ]
+
+        filename = f"preview_export_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
+
+        return {
+            "xd_id": 0,
             "file": filename,
             "sodong": len(items),
             "total": total,

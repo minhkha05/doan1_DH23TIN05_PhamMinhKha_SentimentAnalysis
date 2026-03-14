@@ -21,6 +21,7 @@ class VaiTroEnum(str, Enum):
 class DangNhapEnum(str, Enum):
     email = "email"
     sodienthoai = "sodienthoai"
+    google = "google"
 
 
 class CamXucEnum(str, Enum):
@@ -189,6 +190,27 @@ class AnalyzeResponse(BaseModel):
     data: KetQuaResponse
 
 
+class BatchAnalyzeItem(BaseModel):
+    """Một dòng kết quả trong phân tích hàng loạt."""
+    index: int
+    noidung: str
+    camxuc: Optional[CamXucEnum] = None
+    tincay: Optional[float] = None
+    model: Optional[str] = None
+    vb_id: Optional[int] = None
+    kq_id: Optional[int] = None
+    error: Optional[str] = None
+
+
+class BatchAnalyzeResponse(BaseModel):
+    """Response cho phân tích cảm xúc từ file upload."""
+    success: bool = True
+    total_rows: int
+    success_count: int
+    failed_count: int
+    items: List[BatchAnalyzeItem]
+
+
 # ══════════════════════════════════════════════════════════
 # HISTORY Schemas
 # ══════════════════════════════════════════════════════════
@@ -247,6 +269,8 @@ class ExportItem(BaseModel):
     tincay: Optional[float] = None
     camxuc_suanhan: Optional[CamXucEnum] = None
     camxuc_final: Optional[CamXucEnum] = None
+    model_ai: Optional[str] = None
+    thoigian_phan_tich: Optional[datetime] = None
     vb_taoluc: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -259,6 +283,24 @@ class ExportResponse(BaseModel):
     file: str
     sodong: int
     items: List[ExportItem]
+
+
+class ExportPreviewItem(BaseModel):
+    """Một dòng preview dữ liệu trước khi export."""
+    noidung: str
+    camxuc: Optional[CamXucEnum] = None
+    tincay: Optional[float] = None
+    model_ai: Optional[str] = None
+    thoigian_phan_tich: Optional[datetime] = None
+
+
+class ExportHistoryItem(BaseModel):
+    """Một dòng thống kê lịch sử export."""
+    xd_id: int
+    ten_file: str
+    so_dong: int
+    nguoi_xuat: str
+    thoigian_xuat: Optional[datetime] = None
 
 
 # ══════════════════════════════════════════════════════════

@@ -8,6 +8,7 @@ import {
     HiOutlineCheck,
     HiOutlineChevronLeft,
     HiOutlineChevronRight,
+    HiOutlineEye,
 } from 'react-icons/hi2';
 import { adminService } from '../../services/adminService';
 import type { ExportItem, CamXuc } from '../../types';
@@ -27,6 +28,7 @@ const LabelsPage: React.FC = () => {
     const [totalPages, setTotalPages] = useState(0);
     const [total, setTotal] = useState(0);
     const [editingId, setEditingId] = useState<number | null>(null);
+    const [viewText, setViewText] = useState<string | null>(null);
     const [selectedSentiment, setSelectedSentiment] = useState<CamXuc>('positive');
     const [updating, setUpdating] = useState(false);
     const pageSize = 15;
@@ -142,15 +144,24 @@ const LabelsPage: React.FC = () => {
                                                 </button>
                                             </div>
                                         ) : (
-                                            <button
-                                                className="btn btn-secondary btn-sm"
-                                                onClick={() => {
-                                                    setEditingId(item.vb_id);
-                                                    setSelectedSentiment(item.camxuc_final || 'neutral');
-                                                }}
-                                            >
-                                                Sửa
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                <button
+                                                    className="btn btn-ghost btn-sm"
+                                                    onClick={() => setViewText(item.noidung)}
+                                                    title="Xem chi tiết"
+                                                >
+                                                    <HiOutlineEye size={18}  />
+                                                </button>
+                                                <button
+                                                    className="btn btn-secondary btn-sm"
+                                                    onClick={() => {
+                                                        setEditingId(item.vb_id);
+                                                        setSelectedSentiment(item.camxuc_final || 'neutral');
+                                                    }}
+                                                >
+                                                    Sửa
+                                                </button>
+                                            </div>
                                         )}
                                     </td>
                                 </tr>
@@ -173,8 +184,40 @@ const LabelsPage: React.FC = () => {
                     </button>
                 </div>
             )}
+
+            {viewText !== null && (
+                <div className="confirm-overlay" onClick={() => setViewText(null)}>
+                    <div className="confirm-dialog" style={{ maxWidth: '600px', width: '90%' }} onClick={(e) => e.stopPropagation()}>
+                        <h3>Chi tiết nội dung</h3>
+                        <div style={{
+                            maxHeight: '400px',
+                            overflowY: 'auto',
+                            padding: '1rem',
+                            marginTop: '1rem',
+                            marginBottom: '1.5rem',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid var(--border-light)',
+                            borderRadius: '8px',
+                            lineHeight: '1.6',
+                            color: 'var(--text-primary)',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            textAlign: 'left'
+                        }}>
+                            {viewText}
+                        </div>
+                        <div className="confirm-actions">
+                            <button className="btn btn-primary" onClick={() => setViewText(null)}>
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
 export default LabelsPage;
+
+

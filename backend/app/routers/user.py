@@ -5,7 +5,7 @@ Endpoints: analyze, history
 
 import math
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -13,6 +13,8 @@ from app.dependencies import get_current_user
 from app.models.models import TaiKhoan
 from app.schemas.schemas import (
     AnalyzeRequest,
+    BatchAnalyzeItem,
+    BatchAnalyzeResponse,
     AnalyzeResponse,
     ChangePasswordRequest,
     HistoryItem,
@@ -23,6 +25,7 @@ from app.schemas.schemas import (
 )
 from app.services.analysis_service import AnalysisService
 from app.services.auth_service import AuthService
+from app.services.file_parser_service import extract_text_rows_from_upload
 
 router = APIRouter(prefix="/api/v1/user", tags=["User"])
 
@@ -48,6 +51,41 @@ async def analyze_text(
         noidung=body.noidung,
     )
     return AnalyzeResponse(data=KetQuaResponse(**result))
+
+
+@router.post(
+    "/analyze-batch",
+    response_model=BatchAnalyzeResponse,
+    summary="Phân tích cảm xúc từ file upload",
+    description="Upload file .txt/.csv/.tsv chứa nhiều câu đánh giá và lưu toàn bộ kết quả vào DB.",
+)
+async def analyze_batch(
+    file: UploadFile = File(...),
+    current_user: TaiKhoan = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    texts = await extract_text_rows_from_upload(file)
+
+    service = AnalysisService(db)
+    results = await service.analyze_batch_texts(user_id=current_user.tk_id, texts=texts)
+
+    return BatchAnalyzeResponse(
+        total_rows=len(texts),
+        success_count=len(results),
+        failed_count=0,
+        items=[
+            BatchAnalyzeItem(
+                index=item["index"],
+                noidung=item["noidung"],
+                camxuc=item["camxuc"],
+                tincay=item["tincay"],
+                model=item["model"],
+                vb_id=item["vb_id"],
+                kq_id=item["kq_id"],
+            )
+            for item in results
+        ],
+    )
 
 
 # ══════════════════════════════════════════════════════════

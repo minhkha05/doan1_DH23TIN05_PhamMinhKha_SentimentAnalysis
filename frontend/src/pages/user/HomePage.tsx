@@ -10,9 +10,10 @@ import {
     HiOutlineFaceFrown,
     HiOutlineMinusCircle,
     HiOutlineArrowPath,
+    HiOutlineArrowUpTray,
 } from 'react-icons/hi2';
 import { userService } from '../../services/userService';
-import type { KetQuaResponse, CamXuc } from '../../types';
+import type { BatchAnalyzeItem, KetQuaResponse, CamXuc } from '../../types';
 import toast from 'react-hot-toast';
 import './HomePage.css';
 
@@ -26,6 +27,9 @@ const HomePage: React.FC = () => {
     const [text, setText] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<KetQuaResponse | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [batchResults, setBatchResults] = useState<BatchAnalyzeItem[]>([]);
 
     const handleAnalyze = async () => {
         if (!text.trim()) {
@@ -48,6 +52,43 @@ const HomePage: React.FC = () => {
     const handleReset = () => {
         setText('');
         setResult(null);
+    };
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0] || null;
+        if (!file) {
+            setSelectedFile(null);
+            return;
+        }
+
+        const lowerName = file.name.toLowerCase();
+        const validExt = lowerName.endsWith('.txt') || lowerName.endsWith('.csv') || lowerName.endsWith('.tsv');
+        if (!validExt) {
+            toast.error('Chỉ hỗ trợ file .txt, .csv, .tsv');
+            event.target.value = '';
+            setSelectedFile(null);
+            return;
+        }
+
+        setSelectedFile(file);
+    };
+
+    const handleAnalyzeFile = async () => {
+        if (!selectedFile) {
+            toast.error('Vui lòng chọn file trước khi phân tích.');
+            return;
+        }
+
+        setUploading(true);
+        try {
+            const res = await userService.analyzeBatch(selectedFile);
+            setBatchResults(res.items || []);
+            toast.success(`Đã phân tích ${res.success_count}/${res.total_rows} dòng.`);
+        } catch (err: any) {
+            toast.error(err.response?.data?.detail || 'Không thể phân tích file.');
+        } finally {
+            setUploading(false);
+        }
     };
 
     const config = result ? sentimentConfig[result.camxuc] : null;
@@ -139,6 +180,79 @@ const HomePage: React.FC = () => {
                         </div>
                     </div>
                 )}
+
+                <div className="home-batch-card glass-card-static animate-fade-in-up stagger-2">
+                    <div className="home-batch-header">
+                        <h2><HiOutlineArrowUpTray /> Phân tích từ file</h2>
+                        <span>Hỗ trợ .txt, .csv, .tsv (tối đa 500 dòng)</span>
+                    </div>
+
+                    <div className="home-batch-controls">
+                        <input
+                            type="file"
+                            accept=".txt,.csv,.tsv"
+                            onChange={handleFileChange}
+                            disabled={uploading}
+                        />
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleAnalyzeFile}
+                            disabled={uploading || !selectedFile}
+                        >
+                            {uploading ? (
+                                <>
+                                    <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                                    Đang xử lý file...
+                                </>
+                            ) : (
+                                <>
+                                    <HiOutlineArrowUpTray />
+                                    Upload và phân tích
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    {selectedFile && (
+                        <p className="home-batch-file">File đã chọn: <strong>{selectedFile.name}</strong></p>
+                    )}
+
+                    {batchResults.length > 0 && (
+                        <div className="home-batch-results">
+                            <h3>Kết quả file ({batchResults.length} dòng)</h3>
+                            <div className="home-batch-table-wrapper">
+                                <table className="table home-batch-table">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Nội dung</th>
+                                            <th>Cảm xúc</th>
+                                            <th>Tin cậy</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {batchResults.map((item) => (
+                                            <tr key={`${item.index}-${item.kq_id || item.noidung}`}>
+                                                <td>{item.index}</td>
+                                                <td className="home-batch-cell-text">{item.noidung}</td>
+                                                <td>
+                                                    {item.camxuc ? (
+                                                        <span className={`badge badge-${sentimentConfig[item.camxuc].class}`}>
+                                                            {sentimentConfig[item.camxuc].label}
+                                                        </span>
+                                                    ) : '—'}
+                                                </td>
+                                                <td className="home-batch-confidence">
+                                                    {item.tincay != null ? `${(item.tincay * 100).toFixed(1)}%` : '—'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
