@@ -200,6 +200,52 @@ input::-webkit-credentials-auto-fill-button {
     color: var(--text-primary);
 }
 
+/* ── Google Login Button ───────────────── */
+.auth-google-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    background: white !important;
+    color: #333 !important;
+    border: 1px solid #ddd !important;
+    transition: all 0.2s ease;
+}
+
+.auth-google-btn:hover {
+    background: #f8f9fa !important;
+    border-color: #ccc !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.auth-google-btn svg {
+    flex-shrink: 0;
+}
+
+/* ── Divider ───────────────────────────── */
+.auth-divider {
+    display: flex;
+    align-items: center;
+    margin: var(--space-6) 0;
+    text-align: center;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
+}
+
+.auth-divider span {
+    padding: 0 var(--space-4);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    background: var(--bg-primary);
+}
+
 .auth-remember-checkbox input {
     accent-color: var(--primary-500);
     width: 16px;

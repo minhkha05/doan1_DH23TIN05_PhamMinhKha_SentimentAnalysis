@@ -13,6 +13,8 @@ import {
     HiOutlineMinusCircle,
     HiOutlineArrowPath,
     HiOutlineArrowLeft,
+    HiOutlineArrowUpTray,
+    HiOutlineLockClosed,
 } from 'react-icons/hi2';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -151,6 +153,26 @@ const FreeTrialPage: React.FC = () => {
                                 )}
                             </button>
                         </div>
+
+                        <div className="free-trial-upload-locked">
+                            <div className="free-trial-upload-locked-title">
+                                <HiOutlineLockClosed /> Upload file phân tích hàng loạt
+                            </div>
+                            <p>
+                                Tính năng upload file nhiều câu đánh giá chỉ mở sau khi đăng nhập.
+                            </p>
+                            <div className="free-trial-upload-locked-actions">
+                                <button className="btn btn-primary" onClick={() => navigate('/login')}>
+                                    Đăng nhập để mở khóa
+                                </button>
+                                <button className="btn btn-ghost" onClick={() => navigate('/register')}>
+                                    Đăng ký
+                                </button>
+                            </div>
+                            <div className="free-trial-upload-locked-filebox">
+                                <HiOutlineArrowUpTray /> Hỗ trợ .txt, .csv, .tsv sau khi đăng nhập
+                            </div>
+                        </div>
                     </div>
 
                     {/* Result */}
@@ -162,7 +184,6 @@ const FreeTrialPage: React.FC = () => {
                                     <div className={`badge badge-${config.className}`}>
                                         {config.icon} {config.label}
                                     </div>
-                                    <span className="free-trial-result-model">Model: {result.model}</span>
                                 </div>
 
                                 <div className="free-trial-confidence">

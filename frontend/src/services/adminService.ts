@@ -5,14 +5,21 @@
 import api from './api';
 import type {
     AdminTextItem,
+    BatchAnalyzeResponse,
+    CamXuc,
     DashboardStats,
+    ExportDownloadMeta,
+    ExportFileFormat,
+    ExportHistoryRow,
     ExportItem,
+    ExportPreviewItem,
     ExportResponse,
     LabelUpdateRequest,
     LabelUpdateResponse,
     PaginatedResponse,
     SuccessResponse,
 } from '../types';
+import type { AxiosResponse } from 'axios';
 
 const ADMIN_PREFIX = '/api/v1/admin';
 
@@ -123,6 +130,60 @@ export const adminService = {
         return res.data;
     },
 
+    downloadExportFile: async (params: {
+        start_date?: string;
+        end_date?: string;
+        sentiment?: CamXuc;
+        model_ai?: string;
+        file_format: ExportFileFormat;
+    }): Promise<{ blob: Blob; meta: ExportDownloadMeta }> => {
+        const res: AxiosResponse<Blob> = await api.get(`${ADMIN_PREFIX}/export/download`, {
+            params,
+            responseType: 'blob',
+        });
+
+        const xdId = Number(res.headers['x-export-id'] || 0);
+        const fallbackFile = `export.${params.file_format}`;
+
+        const contentDisposition = String(res.headers['content-disposition'] || '');
+        const dispositionMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+        const fileFromDisposition = dispositionMatch?.[1];
+
+        const file = String(res.headers['x-export-file'] || fileFromDisposition || fallbackFile);
+        const sodong = Number(res.headers['x-export-rows'] || 0);
+
+        return {
+            blob: res.data,
+            meta: {
+                xd_id: xdId,
+                file,
+                sodong,
+            },
+        };
+    },
+
+    getExportPreview: async (params: {
+        page?: number;
+        page_size?: number;
+        start_date?: string;
+        end_date?: string;
+        sentiment?: CamXuc;
+        model_ai?: string;
+    }): Promise<PaginatedResponse<ExportPreviewItem>> => {
+        const res = await api.get(`${ADMIN_PREFIX}/export/preview`, { params });
+        return res.data;
+    },
+
+    getExportHistory: async (
+        page = 1,
+        pageSize = 20,
+    ): Promise<PaginatedResponse<ExportHistoryRow>> => {
+        const res = await api.get(`${ADMIN_PREFIX}/export/history`, {
+            params: { page, page_size: pageSize },
+        });
+        return res.data;
+    },
+
     // ── Model management ───────────────────────────
     getModels: async (): Promise<{ models: ModelInfo[]; active_model: string | null }> => {
         const res = await api.get(`${ADMIN_PREFIX}/models`);
@@ -131,6 +192,16 @@ export const adminService = {
 
     testModel: async (noidung: string, model_name: string): Promise<any> => {
         const res = await api.post(`${ADMIN_PREFIX}/models/test`, { noidung, model_name });
+        return res.data;
+    },
+
+    testModelBatch: async (file: File, model_name: string): Promise<BatchAnalyzeResponse> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('model_name', model_name);
+        const res = await api.post(`${ADMIN_PREFIX}/models/test-batch`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
         return res.data;
     },
 
@@ -151,6 +222,15 @@ export const adminService = {
 
     deleteText: async (vbId: number): Promise<SuccessResponse> => {
         const res = await api.delete(`${ADMIN_PREFIX}/texts/${vbId}`);
+        return res.data;
+    },
+
+    analyzeBatch: async (file: File): Promise<BatchAnalyzeResponse> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await api.post(`${ADMIN_PREFIX}/analyze-batch`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
         return res.data;
     },
 };

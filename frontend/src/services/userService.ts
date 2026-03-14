@@ -5,6 +5,7 @@
 import api from './api';
 import type {
     AnalyzeRequest,
+    BatchAnalyzeResponse,
     AnalyzeResponse,
     ChangePasswordRequest,
     HistoryItem,
@@ -17,6 +18,15 @@ const USER_PREFIX = '/api/v1/user';
 export const userService = {
     analyzeText: async (data: AnalyzeRequest): Promise<AnalyzeResponse> => {
         const res = await api.post(`${USER_PREFIX}/analyze`, data);
+        return res.data;
+    },
+
+    analyzeBatch: async (file: File): Promise<BatchAnalyzeResponse> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await api.post(`${USER_PREFIX}/analyze-batch`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
         return res.data;
     },
 

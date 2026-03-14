@@ -121,7 +121,7 @@ class AuthService:
         return {
             "access_token": token,
             "token_type": "bearer",
-            "vaitro": user.tk_vaitro,
+            "vaitro": user.tk_vaitro.value,
             "tk_id": user.tk_id,
         }
 
@@ -175,3 +175,70 @@ class AuthService:
 
         user.tk_matkhau = hash_password(new_password)
         await self.db.flush()
+
+    # ── Google Login ─────────────────────────────────────
+    async def google_login(self, google_id: str, email: Optional[str], name: Optional[str]) -> dict:
+        """
+        Authenticate or create user via Google OAuth.
+        """
+        # Check if user exists by Google ID
+        stmt = select(TaiKhoan).where(
+            TaiKhoan.tk_google_id == google_id,
+            TaiKhoan.tk_xoa == False,  # noqa: E712
+        )
+        result = await self.db.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            # Check if email already exists
+            if email:
+                email_stmt = select(TaiKhoan).where(
+                    TaiKhoan.tk_email == email,
+                    TaiKhoan.tk_xoa == False,  # noqa: E712
+                )
+                email_result = await self.db.execute(email_stmt)
+                existing_user = email_result.scalar_one_or_none()
+                if existing_user:
+                    # Link Google ID to existing account
+                    existing_user.tk_google_id = google_id
+                    existing_user.tk_dangnhap = DangNhap.google
+                    user = existing_user
+                else:
+                    # Create new user
+                    user = TaiKhoan(
+                        tk_email=email,
+                        tk_google_id=google_id,
+                        tk_vaitro=VaiTro.user,
+                        tk_dangnhap=DangNhap.google,
+                    )
+                    self.db.add(user)
+            else:
+                # Create new user without email
+                user = TaiKhoan(
+                    tk_google_id=google_id,
+                    tk_vaitro=VaiTro.user,
+                    tk_dangnhap=DangNhap.google,
+                )
+                self.db.add(user)
+
+        await self.db.flush()
+        await self.db.refresh(user)
+
+        # Update last login timestamp
+        user.tk_loginluc = datetime.now(timezone.utc).replace(tzinfo=None)
+        await self.db.flush()
+
+        # Create JWT
+        token = create_access_token(
+            data={
+                "sub": str(user.tk_id),
+                "vaitro": user.tk_vaitro.value,
+            }
+        )
+
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "vaitro": user.tk_vaitro.value,
+            "tk_id": user.tk_id,
+        }

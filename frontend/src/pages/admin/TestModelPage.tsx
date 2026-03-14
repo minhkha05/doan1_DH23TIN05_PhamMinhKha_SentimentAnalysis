@@ -6,10 +6,10 @@ import {
     HiOutlineCpuChip,
     HiOutlineCheckCircle,
     HiOutlineStar,
-    HiOutlineChartBar,
+    HiOutlineArrowUpTray,
 } from 'react-icons/hi2';
 import { adminService, type ModelInfo } from '../../services/adminService';
-import type { CamXuc } from '../../types';
+import type { BatchAnalyzeItem, CamXuc } from '../../types';
 import toast from 'react-hot-toast';
 import './AdminPages.css';
 
@@ -38,6 +38,9 @@ const TestModelPage: React.FC = () => {
     const [text, setText] = useState('');
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState<TestResult[]>([]);
+    const [batchResults, setBatchResults] = useState<BatchAnalyzeItem[]>([]);
+    const [batchFile, setBatchFile] = useState<File | null>(null);
+    const [batchLoading, setBatchLoading] = useState(false);
 
     const [models, setModels] = useState<ModelInfo[]>([]);
     const [activeModel, setActiveModel] = useState<string | null>(null);
@@ -46,7 +49,6 @@ const TestModelPage: React.FC = () => {
     const [settingActive, setSettingActive] = useState(false);
 
     const [showConfirm, setShowConfirm] = useState(false);
-    const [showCompare, setShowCompare] = useState(true);
 
     useEffect(() => {
         fetchModels();
@@ -103,6 +105,48 @@ const TestModelPage: React.FC = () => {
             toast.error(message || 'Không thể cập nhật mô hình mặc định.');
         } finally {
             setSettingActive(false);
+        }
+    };
+
+    const handleBatchFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0] || null;
+        if (!file) {
+            setBatchFile(null);
+            return;
+        }
+
+        const lowerName = file.name.toLowerCase();
+        const validExt = lowerName.endsWith('.txt') || lowerName.endsWith('.csv') || lowerName.endsWith('.tsv');
+        if (!validExt) {
+            toast.error('Chỉ hỗ trợ file .txt, .csv, .tsv');
+            event.target.value = '';
+            setBatchFile(null);
+            return;
+        }
+
+        setBatchFile(file);
+    };
+
+    const handleBatchTest = async () => {
+        if (!selectedModel) {
+            toast.error('Vui lòng chọn mô hình trước khi test file.');
+            return;
+        }
+        if (!batchFile) {
+            toast.error('Vui lòng chọn file test.');
+            return;
+        }
+
+        setBatchLoading(true);
+        try {
+            const res = await adminService.testModelBatch(batchFile, selectedModel);
+            setBatchResults(res.items || []);
+            toast.success(`Đã test ${res.success_count}/${res.total_rows} dòng với model ${selectedModel}.`);
+        } catch (err: unknown) {
+            const message = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+            toast.error(message || 'Không thể test file với model đã chọn.');
+        } finally {
+            setBatchLoading(false);
         }
     };
 
@@ -164,57 +208,6 @@ const TestModelPage: React.FC = () => {
                 )}
             </div>
 
-            {models.length > 1 && (
-                <div className="model-compare glass-card-static animate-fade-in-up stagger-3">
-                    <div className="model-details-header">
-                        <h3><HiOutlineChartBar size={18} /> So sánh mô hình</h3>
-                        <button className="btn btn-ghost btn-sm" onClick={() => setShowCompare(!showCompare)}>
-                            {showCompare ? 'Thu gọn' : 'Mở rộng'}
-                        </button>
-                    </div>
-
-                    {showCompare && (
-                        <div className="model-compare-table-wrapper">
-                            <table className="table model-compare-table">
-                                <thead>
-                                    <tr>
-                                        <th>Mô hình</th>
-                                        <th>Số nhãn</th>
-                                        <th>Phiên bản</th>
-                                        <th>Accuracy</th>
-                                        <th>F1</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {models.map((model) => (
-                                        <tr key={model.name} className={model.name === selectedModel ? 'model-compare-selected' : ''}>
-                                            <td>
-                                                <div className="model-compare-name">
-                                                    {model.name}
-                                                    {model.name === activeModel && <span className="model-compare-star">⭐</span>}
-                                                </div>
-                                            </td>
-                                            <td>{model.num_labels || '—'}</td>
-                                            <td>{model.version}</td>
-                                            <td className="admin-td-confidence">
-                                                {model.accuracy
-                                                    ? `${(model.accuracy * 100).toFixed(2)}%`
-                                                    : model.test_accuracy
-                                                        ? `${(model.test_accuracy * 100).toFixed(2)}%`
-                                                        : '—'}
-                                            </td>
-                                            <td className="admin-td-confidence">
-                                                {model.f1_score ? `${(model.f1_score * 100).toFixed(2)}%` : '—'}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            )}
-
             <div className="test-input-card glass-card-static animate-fade-in-up stagger-4">
                 <textarea
                     className="input textarea"
@@ -247,6 +240,38 @@ const TestModelPage: React.FC = () => {
                         ))}
                     </div>
                 </div>
+
+                <div className="test-batch-upload">
+                    <div className="test-batch-header">
+                        <h4><HiOutlineArrowUpTray size={18} /> Test bằng file</h4>
+                        <span>Dùng model đang chọn, không lưu DB</span>
+                    </div>
+                    <div className="test-batch-controls">
+                        <input
+                            type="file"
+                            accept=".txt,.csv,.tsv"
+                            onChange={handleBatchFileChange}
+                            disabled={batchLoading}
+                        />
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleBatchTest}
+                            disabled={batchLoading || !batchFile || !selectedModel}
+                        >
+                            {batchLoading ? (
+                                <>
+                                    <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                                    Đang test file...
+                                </>
+                            ) : (
+                                <>
+                                    <HiOutlineArrowUpTray /> Test file
+                                </>
+                            )}
+                        </button>
+                    </div>
+                    {batchFile && <p className="test-batch-file">File đã chọn: <strong>{batchFile.name}</strong></p>}
+                </div>
             </div>
 
             {results.length > 0 && (
@@ -267,6 +292,43 @@ const TestModelPage: React.FC = () => {
                                 </div>
                             );
                         })}
+                    </div>
+                </div>
+            )}
+
+            {batchResults.length > 0 && (
+                <div className="test-results animate-fade-in-up stagger-5">
+                    <h3>Kết quả test file ({batchResults.length})</h3>
+                    <div className="model-compare-table-wrapper">
+                        <table className="table model-compare-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Nội dung</th>
+                                    <th>Cảm xúc</th>
+                                    <th>Tin cậy</th>
+                                    <th>Model</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {batchResults.map((item) => {
+                                    const config = item.camxuc ? sentimentMap[item.camxuc] : null;
+                                    return (
+                                        <tr key={`${item.index}-${item.noidung}`}>
+                                            <td>{item.index}</td>
+                                            <td className="admin-td-text">{item.noidung}</td>
+                                            <td>
+                                                {config ? <span className={`badge badge-${config.class}`}>{config.label}</span> : '—'}
+                                            </td>
+                                            <td className="admin-td-confidence">
+                                                {item.tincay != null ? `${(item.tincay * 100).toFixed(1)}%` : '—'}
+                                            </td>
+                                            <td className="admin-td-confidence">{item.model || '—'}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}

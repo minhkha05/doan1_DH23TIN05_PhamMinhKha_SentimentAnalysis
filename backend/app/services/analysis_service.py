@@ -61,6 +61,15 @@ class AnalysisService:
             "luclay": ket_qua.kq_luclay,
         }
 
+    async def analyze_batch_texts(self, user_id: int, texts: list[str]) -> list[dict]:
+        """Analyze multiple texts and persist all results for a user."""
+        results: list[dict] = []
+        for idx, text in enumerate(texts, start=1):
+            item = await self.analyze_text(user_id=user_id, noidung=text)
+            item["index"] = idx
+            results.append(item)
+        return results
+
     # ── User History (paginated) ──────────────────────────
     async def get_history(
         self,
