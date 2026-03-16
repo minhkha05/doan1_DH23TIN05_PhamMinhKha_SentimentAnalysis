@@ -109,3 +109,41 @@ async def health():
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
     }
+
+
+# ══════════════════════════════════════════════════════════
+# Phục vụ Frontend (Giao diện React tĩnh)
+# ══════════════════════════════════════════════════════════
+
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from fastapi import HTTPException
+
+# Xác định đường dẫn thư mục frontend đã build
+frontend_build_path = os.path.join(os.path.dirname(__file__), "../../frontend/dist")
+
+if os.path.exists(frontend_build_path):
+    # Phục vụ các file tĩnh (js, css, hình ảnh) từ thư mục assets
+    assets_path = os.path.join(frontend_build_path, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+        
+    # Public root file tĩnh khác ví dụ như vite.svg, favicon
+    @app.get("/{file_name:path}", include_in_schema=False)
+    async def serve_static_root(file_name: str):
+        # Bỏ qua các API route và Swagger Docs
+        if file_name.startswith("api/") or file_name in ["docs", "redoc", "openapi.json"]:
+            raise HTTPException(status_code=404, detail="Not Found")
+            
+        file_path = os.path.join(frontend_build_path, file_name)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+            
+        # Với các route của React Router không khớp file nào, trả về index.html
+        index_file = os.path.join(frontend_build_path, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        
+        raise HTTPException(status_code=404, detail="Not Found")
+
