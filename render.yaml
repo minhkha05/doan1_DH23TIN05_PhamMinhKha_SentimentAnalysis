@@ -9,7 +9,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: PYTHONPATH
-        value: backend
+        value: .
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: DATABASE_URL
