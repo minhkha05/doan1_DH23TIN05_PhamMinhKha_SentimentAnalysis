@@ -24,6 +24,19 @@
     color: var(--text-secondary);
 }
 
+.admin-page .animate-fade-in-up,
+.admin-page .animate-fade-in-down,
+.admin-page .animate-fade-in {
+    animation-duration: 0.42s;
+}
+
+.admin-page .stagger-1 { animation-delay: 0.02s; }
+.admin-page .stagger-2 { animation-delay: 0.04s; }
+.admin-page .stagger-3 { animation-delay: 0.06s; }
+.admin-page .stagger-4 { animation-delay: 0.08s; }
+.admin-page .stagger-5 { animation-delay: 0.1s; }
+.admin-page .stagger-6 { animation-delay: 0.12s; }
+
 /* ── Info Card ──────────────────────────────────── */
 .admin-info-card {
     padding: var(--space-8);
@@ -85,6 +98,9 @@
     padding: 0;
     overflow: hidden;
     margin-bottom: var(--space-4);
+    contain: layout paint style;
+    content-visibility: auto;
+    contain-intrinsic-size: 520px;
 }
 
 .admin-td-id {
@@ -782,6 +798,7 @@
 .users-table-container {
     overflow-x: auto;
     min-height: 400px;
+    contain: layout paint;
 }
 
 .users-table {
@@ -835,6 +852,14 @@
 
 .users-table tbody tr:hover {
     background: var(--bg-hover);
+}
+
+.users-table tbody tr,
+.users-actions .btn,
+.pagination-btn {
+    transition-property: background-color, color, border-color, transform, opacity;
+    transition-duration: 120ms;
+    transition-timing-function: ease;
 }
 
 .users-table tbody tr:last-child td {
@@ -947,7 +972,7 @@
 
 /* ── Action button icons ────────────────────────── */
 .users-btn-lock {
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .users-btn-lock:hover {
@@ -957,17 +982,15 @@
 
 .users-icon-lock {
     color: #eab308;
-    filter: drop-shadow(0 0 4px rgba(234, 179, 8, 0.3));
-    transition: all 0.2s ease;
+    transition: color 0.2s ease;
 }
 
 .users-btn-lock:hover .users-icon-lock {
     color: #facc15;
-    filter: drop-shadow(0 0 6px rgba(234, 179, 8, 0.5));
 }
 
 .users-btn-delete {
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .users-btn-delete:hover {
@@ -977,13 +1000,25 @@
 
 .users-icon-delete {
     color: #ef4444;
-    filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.3));
-    transition: all 0.2s ease;
+    transition: color 0.2s ease;
 }
 
 .users-btn-delete:hover .users-icon-delete {
     color: #f87171;
-    filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.5));
+}
+
+html.performance-lite .admin-table-wrapper {
+    content-visibility: visible;
+}
+
+html.performance-lite .users-table tbody tr:hover {
+    background: transparent;
+}
+
+html.performance-lite .users-actions .btn,
+html.performance-lite .pagination-btn,
+html.performance-lite .users-table tbody tr {
+    transition: none !important;
 }
 
 /* ── Loading / Empty ───────────────────────────── */

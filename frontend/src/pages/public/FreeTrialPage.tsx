@@ -14,9 +14,9 @@ import {
     HiOutlineArrowPath,
     HiOutlineArrowLeft,
     HiOutlineArrowUpTray,
-    HiOutlineLockClosed,
 } from 'react-icons/hi2';
 import api from '../../services/api';
+import type { BatchAnalyzeItem } from '../../types';
 import toast from 'react-hot-toast';
 import './FreeTrialPage.css';
 
@@ -42,7 +42,10 @@ const FreeTrialPage: React.FC = () => {
     const navigate = useNavigate();
     const [text, setText] = useState('');
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [result, setResult] = useState<FreeResult | null>(null);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [batchResults, setBatchResults] = useState<BatchAnalyzeItem[]>([]);
     const [usedCount, setUsedCount] = useState(0);
 
     useEffect(() => {
@@ -90,9 +93,63 @@ const FreeTrialPage: React.FC = () => {
         }
     };
 
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0] || null;
+        if (!file) {
+            setSelectedFile(null);
+            return;
+        }
+
+        const lowerName = file.name.toLowerCase();
+        const validExt = lowerName.endsWith('.txt') || lowerName.endsWith('.csv') || lowerName.endsWith('.tsv');
+        if (!validExt) {
+            toast.error('Chỉ hỗ trợ file .txt, .csv, .tsv');
+            event.target.value = '';
+            setSelectedFile(null);
+            return;
+        }
+
+        setSelectedFile(file);
+    };
+
+    const handleAnalyzeFile = async () => {
+        if (!selectedFile) {
+            toast.error('Vui lòng chọn file trước khi phân tích.');
+            return;
+        }
+        if (usedCount >= MAX_FREE) {
+            toast.error('Bạn đã hết lượt dùng thử miễn phí. Vui lòng đăng ký để tiếp tục.');
+            return;
+        }
+
+        setUploading(true);
+        setBatchResults([]);
+        try {
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            const res = await api.post('/api/v1/user/analyze-free-batch', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+
+            setBatchResults(res.data.items || []);
+            toast.success(`Đã phân tích ${res.data.success_count}/${res.data.total_rows} dòng.`);
+
+            const newCount = usedCount + 1;
+            setUsedCount(newCount);
+            const today = new Date().toDateString();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ count: newCount, date: today }));
+        } catch (err: any) {
+            toast.error(err.response?.data?.detail || 'Không thể phân tích file.');
+        } finally {
+            setUploading(false);
+        }
+    };
+
     const handleReset = () => {
         setText('');
         setResult(null);
+        setBatchResults([]);
+        setSelectedFile(null);
     };
 
     const remaining = MAX_FREE - usedCount;
@@ -154,24 +211,81 @@ const FreeTrialPage: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className="free-trial-upload-locked">
-                            <div className="free-trial-upload-locked-title">
-                                <HiOutlineLockClosed /> Upload file phân tích hàng loạt
+                        <div className="free-trial-upload">
+                            <div className="free-trial-upload-title">
+                                <HiOutlineArrowUpTray /> Upload file phân tích hàng loạt
                             </div>
                             <p>
-                                Tính năng upload file nhiều câu đánh giá chỉ mở sau khi đăng nhập.
+                                Người dùng tự do vẫn có thể upload file để phân tích.
+                                Mỗi lần upload tính 1 lượt, tối đa {MAX_FREE} lượt/ngày.
                             </p>
-                            <div className="free-trial-upload-locked-actions">
-                                <button className="btn btn-primary" onClick={() => navigate('/login')}>
-                                    Đăng nhập để mở khóa
-                                </button>
-                                <button className="btn btn-ghost" onClick={() => navigate('/register')}>
-                                    Đăng ký
+                            <div className="free-trial-upload-controls">
+                                <input
+                                    type="file"
+                                    accept=".txt,.csv,.tsv"
+                                    onChange={handleFileChange}
+                                    disabled={uploading || remaining <= 0}
+                                />
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={handleAnalyzeFile}
+                                    disabled={uploading || !selectedFile || remaining <= 0}
+                                >
+                                    {uploading ? (
+                                        <>
+                                            <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                                            Đang xử lý file...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <HiOutlineArrowUpTray />
+                                            Upload và phân tích
+                                        </>
+                                    )}
                                 </button>
                             </div>
-                            <div className="free-trial-upload-locked-filebox">
-                                <HiOutlineArrowUpTray /> Hỗ trợ .txt, .csv, .tsv sau khi đăng nhập
+                            {selectedFile && (
+                                <div className="free-trial-upload-file">File đã chọn: <strong>{selectedFile.name}</strong></div>
+                            )}
+                            <div className="free-trial-upload-filebox">
+                                Hỗ trợ .txt, .csv, .tsv (tối đa 200 dòng)
                             </div>
+
+                            {batchResults.length > 0 && (
+                                <div className="free-trial-batch-results">
+                                    <h3>Kết quả file ({batchResults.length} dòng)</h3>
+                                    <div className="free-trial-batch-table-wrapper">
+                                        <table className="table free-trial-batch-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Nội dung</th>
+                                                    <th>Cảm xúc</th>
+                                                    <th>Tin cậy</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {batchResults.map((item) => (
+                                                    <tr key={`${item.index}-${item.noidung}`}>
+                                                        <td>{item.index}</td>
+                                                        <td className="free-trial-batch-cell-text">{item.noidung}</td>
+                                                        <td>
+                                                            {item.camxuc ? (
+                                                                <span className={`badge badge-${sentimentConfig[item.camxuc].class}`}>
+                                                                    {sentimentConfig[item.camxuc].label}
+                                                                </span>
+                                                            ) : '—'}
+                                                        </td>
+                                                        <td className="free-trial-batch-confidence">
+                                                            {item.tincay != null ? `${(item.tincay * 100).toFixed(1)}%` : '—'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 

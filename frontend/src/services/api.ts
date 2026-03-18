@@ -27,7 +27,15 @@ api.interceptors.request.use(
 
 // ── Response interceptor: handle 401 ─────────────
 // Don't redirect for public endpoints (free trial, forgot password, etc.)
-const PUBLIC_ENDPOINTS = ['/analyze-free', '/forgot-password', '/verify-reset-code', '/reset-password', '/login', '/register'];
+const PUBLIC_ENDPOINTS = [
+    '/analyze-free',
+    '/analyze-free-batch',
+    '/forgot-password',
+    '/verify-reset-code',
+    '/reset-password',
+    '/login',
+    '/register',
+];
 
 api.interceptors.response.use(
     (response) => response,

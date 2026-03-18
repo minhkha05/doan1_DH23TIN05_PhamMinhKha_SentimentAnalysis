@@ -117,7 +117,7 @@ class AnalysisService:
                 (
                     s
                     for s in sorted(
-                        vb.sua_nhan, key=lambda x: x.sn_lucgan or "", reverse=True
+                        vb.sua_nhan, key=lambda x: x.sn_lucgan or datetime.min, reverse=True
                     )
                     if not s.sn_xoa
                 ),

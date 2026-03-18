@@ -3,7 +3,6 @@ Auth router – /api/v1/auth
 Endpoints: register, login, profile, forgot-password, verify-reset-code, reset-password
 """
 
-import bcrypt
 from urllib.parse import urlencode
 
 import httpx
@@ -14,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.security import hash_password
 from app.dependencies import get_current_user
 from app.models.models import TaiKhoan
 from app.schemas.schemas import (
@@ -181,9 +181,8 @@ async def reset_password(
     if not user:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản.")
 
-    # Hash new password
-    hashed = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-    user.tk_matkhau = hashed
+    # Hash new password using the unified security module
+    user.tk_matkhau = hash_password(new_password)
     await db.commit()
 
     # Consume the code so it can't be reused

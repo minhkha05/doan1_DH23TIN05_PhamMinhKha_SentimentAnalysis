@@ -45,6 +45,7 @@ function getState(el: HTMLElement): SpringState {
 
 // ── Tracked Elements ────────────────────────────────────────
 const trackedEls = new Set<HTMLElement>();
+const ENGINE_MARK = '__glassEngineInitialized';
 
 function trackElement(el: HTMLElement) {
     if (!trackedEls.has(el)) {
@@ -105,11 +106,23 @@ function isAtRest(state: SpringState): boolean {
 }
 
 let rafId: number | null = null;
+let lastMouseX = -1;
+let lastMouseY = -1;
 
 function tick() {
+    if (document.visibilityState !== 'visible') {
+        rafId = null;
+        return;
+    }
+
     let allRest = true;
 
     for (const el of trackedEls) {
+        if (!el.isConnected) {
+            trackedEls.delete(el);
+            continue;
+        }
+
         const s = getState(el);
         springStep(s);
 
@@ -145,20 +158,30 @@ function tick() {
 }
 
 function ensureRunning() {
+    if (document.visibilityState !== 'visible') return;
     if (!rafId) {
         rafId = requestAnimationFrame(tick);
     }
 }
 
 // ── Event Handlers ───────────────────────────────────────────
-function handleMouseMove(e: MouseEvent) {
-    const el = (e.target as HTMLElement).closest('.glass-card, .btn') as HTMLElement | null;
+let pendingMove: MouseEvent | null = null;
+let moveRafId: number | null = null;
 
-    // Update global spotlight vars always
-    document.body.style.setProperty('--mouse-x', `${e.clientX}px`);
-    document.body.style.setProperty('--mouse-y', `${e.clientY}px`);
+function processMouseMove(e: MouseEvent) {
+    const el = (e.target as HTMLElement).closest('.glass-card') as HTMLElement | null;
 
-    if (!el) return;
+    if (Math.abs(e.clientX - lastMouseX) > 1 || Math.abs(e.clientY - lastMouseY) > 1) {
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+        document.body.style.setProperty('--mouse-x', `${e.clientX}px`);
+        document.body.style.setProperty('--mouse-y', `${e.clientY}px`);
+    }
+
+    if (!el) {
+        return;
+    }
+
     trackElement(el);
 
     const rect = el.getBoundingClientRect();
@@ -182,8 +205,21 @@ function handleMouseMove(e: MouseEvent) {
     ensureRunning();
 }
 
+function handleMouseMove(e: MouseEvent) {
+    if (document.visibilityState !== 'visible') return;
+
+    pendingMove = e;
+    if (moveRafId) return;
+
+    moveRafId = requestAnimationFrame(() => {
+        moveRafId = null;
+        if (pendingMove) processMouseMove(pendingMove);
+        pendingMove = null;
+    });
+}
+
 function handleMouseLeave(e: MouseEvent) {
-    const el = (e.target as HTMLElement).closest('.glass-card, .btn') as HTMLElement | null;
+    const el = (e.target as HTMLElement).closest('.glass-card') as HTMLElement | null;
     if (!el) return;
 
     const s = getState(el);
@@ -197,7 +233,7 @@ function handleMouseLeave(e: MouseEvent) {
 }
 
 function handleMouseDown(e: MouseEvent) {
-    const el = (e.target as HTMLElement).closest('.glass-card, .btn') as HTMLElement | null;
+    const el = (e.target as HTMLElement).closest('.glass-card') as HTMLElement | null;
     if (!el) return;
 
     const rect = el.getBoundingClientRect();
@@ -227,9 +263,39 @@ function handleMouseDown(e: MouseEvent) {
     }, 900);
 }
 
+function handleVisibilityChange() {
+    if (document.visibilityState !== 'visible') {
+        if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+        }
+        if (moveRafId) {
+            cancelAnimationFrame(moveRafId);
+            moveRafId = null;
+        }
+        pendingMove = null;
+        return;
+    }
+
+    ensureRunning();
+}
+
 // ── Init ─────────────────────────────────────────────────────
 export function initGlassEngine() {
+    const w = window as unknown as Record<string, unknown>;
+    if (w[ENGINE_MARK]) {
+        return;
+    }
+    w[ENGINE_MARK] = true;
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+    if (reducedMotion || coarsePointer) {
+        return;
+    }
+
     document.addEventListener('mousemove', handleMouseMove, { passive: true });
     document.addEventListener('mouseleave', handleMouseLeave, true);
     document.addEventListener('mousedown', handleMouseDown, { passive: true });
+    document.addEventListener('visibilitychange', handleVisibilityChange, { passive: true });
 }
