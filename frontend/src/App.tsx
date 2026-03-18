@@ -2,7 +2,7 @@
    App – Root router configuration
    ═══════════════════════════════════════════════════ */
 
-import React from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
@@ -12,72 +12,110 @@ import ProtectedRoute from './components/guards/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
 
 // Public pages
-import LandingPage from './pages/public/LandingPage';
-import LoginPage from './pages/public/LoginPage';
-import RegisterPage from './pages/public/RegisterPage';
-import ForgotPasswordPage from './pages/public/ForgotPasswordPage';
-import FreeTrialPage from './pages/public/FreeTrialPage';
-import AuthCallbackPage from './pages/public/AuthCallbackPage';
+const LandingPage = lazy(() => import('./pages/public/LandingPage'));
+const LoginPage = lazy(() => import('./pages/public/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/public/RegisterPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/public/ForgotPasswordPage'));
+const FreeTrialPage = lazy(() => import('./pages/public/FreeTrialPage'));
+const AuthCallbackPage = lazy(() => import('./pages/public/AuthCallbackPage'));
 
 // User pages
-import HomePage from './pages/user/HomePage';
-import HistoryPage from './pages/user/HistoryPage';
-import ProfilePage from './pages/user/ProfilePage';
+const HomePage = lazy(() => import('./pages/user/HomePage'));
+const HistoryPage = lazy(() => import('./pages/user/HistoryPage'));
+const ProfilePage = lazy(() => import('./pages/user/ProfilePage'));
 
 // Admin pages
-import DashboardPage from './pages/admin/DashboardPage';
-import UsersPage from './pages/admin/UsersPage';
-import LabelsPage from './pages/admin/LabelsPage';
-import TestModelPage from './pages/admin/TestModelPage';
-import ExportPage from './pages/admin/ExportPage';
-import TextsPage from './pages/admin/TextsPage';
+const DashboardPage = lazy(() => import('./pages/admin/DashboardPage'));
+const UsersPage = lazy(() => import('./pages/admin/UsersPage'));
+const LabelsPage = lazy(() => import('./pages/admin/LabelsPage'));
+const TestModelPage = lazy(() => import('./pages/admin/TestModelPage'));
+const ExportPage = lazy(() => import('./pages/admin/ExportPage'));
+const TextsPage = lazy(() => import('./pages/admin/TextsPage'));
+
+const RouteFallback: React.FC = () => (
+  <div className="page-loader" aria-live="polite" aria-busy="true">
+    <div className="spinner" />
+    <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>Đang tải trang...</span>
+  </div>
+);
 
 const App: React.FC = () => {
+  useEffect(() => {
+    const preloaders = [
+      () => import('./pages/user/HomePage'),
+      () => import('./pages/user/HistoryPage'),
+      () => import('./pages/admin/DashboardPage'),
+      () => import('./pages/admin/UsersPage'),
+      () => import('./pages/admin/ExportPage'),
+    ];
+
+    const runPrefetch = () => {
+      for (const load of preloaders) {
+        void load();
+      }
+    };
+
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(runPrefetch, { timeout: 1500 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+
+    const timeoutId = window.setTimeout(runPrefetch, 700);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
   return (
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
-          <Routes>
-            {/* ── Public routes ─────────────────────── */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/try" element={<FreeTrialPage />} />
-            <Route path="/auth/callback" element={<AuthCallbackPage />} />
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              {/* ── Public routes ─────────────────────── */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/try" element={<FreeTrialPage />} />
+              <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
-            {/* ── Protected routes (user) ───────────── */}
-            <Route
-              element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="/home" element={<HomePage />} />
-              <Route path="/history" element={<HistoryPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-            </Route>
+              {/* ── Protected routes (user) ───────────── */}
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/home" element={<HomePage />} />
+                <Route path="/history" element={<HistoryPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+              </Route>
 
-            {/* ── Protected routes (admin) ──────────── */}
-            <Route
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="/admin/dashboard" element={<DashboardPage />} />
-              <Route path="/admin/users" element={<UsersPage />} />
-              <Route path="/admin/texts" element={<TextsPage />} />
-              <Route path="/admin/labels" element={<LabelsPage />} />
-              <Route path="/admin/test-model" element={<TestModelPage />} />
-              <Route path="/admin/export" element={<ExportPage />} />
-            </Route>
+              {/* ── Protected routes (admin) ──────────── */}
+              <Route
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/admin/dashboard" element={<DashboardPage />} />
+                <Route path="/admin/users" element={<UsersPage />} />
+                <Route path="/admin/texts" element={<TextsPage />} />
+                <Route path="/admin/labels" element={<LabelsPage />} />
+                <Route path="/admin/test-model" element={<TestModelPage />} />
+                <Route path="/admin/export" element={<ExportPage />} />
+              </Route>
 
-            {/* ── Fallback ──────────────────────────── */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              {/* ── Fallback ──────────────────────────── */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
 
         <Toaster

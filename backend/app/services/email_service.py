@@ -5,7 +5,7 @@ Uses SMTP (Gmail App Password recommended).
 
 import random
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Tuple
 
 import smtplib
@@ -26,7 +26,7 @@ def generate_code(length: int = 6) -> str:
 
 def store_code(email: str, code: str, ttl_minutes: int = 10):
     """Store verification code with expiry."""
-    _reset_codes[email.lower()] = (code, datetime.utcnow() + timedelta(minutes=ttl_minutes))
+    _reset_codes[email.lower()] = (code, datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes))
 
 
 def verify_code(email: str, code: str) -> bool:
@@ -35,7 +35,7 @@ def verify_code(email: str, code: str) -> bool:
     if key not in _reset_codes:
         return False
     stored_code, expiry = _reset_codes[key]
-    if datetime.utcnow() > expiry:
+    if datetime.now(timezone.utc) > expiry:
         del _reset_codes[key]
         return False
     if stored_code != code:

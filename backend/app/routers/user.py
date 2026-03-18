@@ -142,6 +142,44 @@ async def analyze_free(body: AnalyzeRequest):
     }
 
 
+# ══════════════════════════════════════════════════════════
+# POST /analyze-free-batch (no auth, no DB save)
+# ══════════════════════════════════════════════════════════
+
+@router.post(
+    "/analyze-free-batch",
+    response_model=BatchAnalyzeResponse,
+    summary="Phân tích cảm xúc miễn phí từ file upload (không lưu DB)",
+    description="Upload file .txt/.csv/.tsv để phân tích nhanh, không lưu kết quả vào DB.",
+)
+async def analyze_free_batch(file: UploadFile = File(...)):
+    from app.services.ai_service import predict_sentiment
+
+    texts = await extract_text_rows_from_upload(file)
+    max_rows = 200
+    texts = texts[:max_rows]
+
+    items: list[BatchAnalyzeItem] = []
+    for idx, text in enumerate(texts, start=1):
+        prediction = await predict_sentiment(text)
+        items.append(
+            BatchAnalyzeItem(
+                index=idx,
+                noidung=text,
+                camxuc=prediction["camxuc"],
+                tincay=prediction["tincay"],
+                model=prediction["model"],
+            )
+        )
+
+    return BatchAnalyzeResponse(
+        total_rows=len(texts),
+        success_count=len(items),
+        failed_count=0,
+        items=items,
+    )
+
+
 # ════════════════════════════════════════════════════════
 # DELETE /history/clear (Đặt trước /{id} để tránh conflict)
 # ════════════════════════════════════════════════════════

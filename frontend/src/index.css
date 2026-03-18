@@ -241,8 +241,9 @@ body::before {
   background-size: 200% 200%;
   pointer-events: none;
   z-index: 0;
-  animation: liquid-mesh 20s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
-  filter: blur(40px) saturate(1.2);
+  animation: liquid-mesh 30s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+  filter: blur(28px) saturate(1.1);
+  will-change: transform;
 }
 
 body::after {
@@ -256,6 +257,17 @@ body::after {
   pointer-events: none;
   z-index: 0;
   transition: opacity 1s;
+  will-change: opacity;
+}
+
+html.performance-lite body::before {
+  animation: none;
+  filter: blur(12px) saturate(1);
+  opacity: 0.65;
+}
+
+html.performance-lite body::after {
+  opacity: 0.35;
 }
 
 @keyframes liquid-mesh {
@@ -328,7 +340,7 @@ select {
     opacity 0.5s;
   transform: perspective(1400px) rotateX(0deg) rotateY(0deg) translateY(0) translateZ(0);
   transform-style: preserve-3d;
-  will-change: transform, box-shadow;
+  will-change: auto;
   overflow: hidden;
   z-index: 1;
 }
@@ -375,6 +387,7 @@ select {
 }
 
 .glass-card:hover {
+  will-change: transform, box-shadow;
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.12), var(--shadow-glow), inset 0 0 0 1.5px var(--glass-border);
   /* 3D Parallax Hover */
   transform: perspective(1200px) rotateX(var(--rotate-x, 0deg)) rotateY(var(--rotate-y, 0deg)) translateY(-4px) translateZ(30px);
@@ -424,13 +437,17 @@ select {
     opacity 0.4s;
   transform: perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1) translateZ(0);
   transform-style: preserve-3d;
-  will-change: transform, box-shadow;
+  will-change: auto;
   white-space: nowrap;
   user-select: none;
   position: relative;
   overflow: hidden;
   border: 1px solid transparent;
   z-index: 1;
+}
+
+.btn:hover {
+  will-change: transform, box-shadow;
 }
 
 /* Inner liquid reflection */
@@ -886,6 +903,80 @@ select {
 
 .animate-breath {
   animation: breathing 4s ease-in-out infinite;
+}
+
+html.performance-lite .glass-card,
+html.performance-lite .glass-card-static {
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+}
+
+html.performance-lite .glass-card,
+html.performance-lite .btn {
+  will-change: auto;
+}
+
+html.performance-lite .glass-card::before,
+html.performance-lite .glass-card::after,
+html.performance-lite .btn::before,
+html.performance-lite .btn::after {
+  display: none;
+}
+
+html.performance-lite .animate-breath,
+html.performance-lite .liquid-ripple {
+  animation: none !important;
+}
+
+html.performance-lite .stagger-1,
+html.performance-lite .stagger-2,
+html.performance-lite .stagger-3,
+html.performance-lite .stagger-4,
+html.performance-lite .stagger-5,
+html.performance-lite .stagger-6 {
+  animation-delay: 0s !important;
+}
+
+html.app-first-paint .animate-fade-in,
+html.app-first-paint .animate-fade-in-up,
+html.app-first-paint .animate-fade-in-down,
+html.app-first-paint .animate-scale-in,
+html.app-first-paint .animate-slide-left,
+html.app-first-paint .animate-breath,
+html.app-first-paint .stagger-1,
+html.app-first-paint .stagger-2,
+html.app-first-paint .stagger-3,
+html.app-first-paint .stagger-4,
+html.app-first-paint .stagger-5,
+html.app-first-paint .stagger-6 {
+  animation: none !important;
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after {
+    animation: none !important;
+    transition: none !important;
+    filter: none !important;
+  }
+
+  .animate-fade-in,
+  .animate-fade-in-up,
+  .animate-fade-in-down,
+  .animate-scale-in,
+  .animate-slide-left,
+  .animate-breath,
+  .liquid-ripple,
+  .stagger-1,
+  .stagger-2,
+  .stagger-3,
+  .stagger-4,
+  .stagger-5,
+  .stagger-6 {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
