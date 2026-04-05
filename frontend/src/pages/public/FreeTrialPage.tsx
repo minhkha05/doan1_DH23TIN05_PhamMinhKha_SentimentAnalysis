@@ -271,7 +271,7 @@ const FreeTrialPage: React.FC = () => {
                                                         <td className="free-trial-batch-cell-text">{item.noidung}</td>
                                                         <td>
                                                             {item.camxuc ? (
-                                                                <span className={`badge badge-${sentimentConfig[item.camxuc].class}`}>
+                                                                <span className={`badge badge-${sentimentConfig[item.camxuc].className}`}>
                                                                     {sentimentConfig[item.camxuc].label}
                                                                 </span>
                                                             ) : '—'}
