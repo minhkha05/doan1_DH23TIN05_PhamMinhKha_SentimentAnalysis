@@ -1,23 +1,26 @@
-# 🌟 Hệ Thống AI Sentiment Analysis - Phân Tích Cảm Xúc Tiếng Việt
+# AI Sentiment Analysis (Vietnamese)
 
-Dự án phân tích cảm xúc tiếng Việt theo 3 nhãn: **Tiêu cực**, **Tích cực**, **Trung tính**. Hệ thống gồm Backend API + Frontend Web.
+## English
 
-## 🛠️ Công Nghệ Sử Dụng
-- **Backend**: FastAPI, PostgreSQL, SQLAlchemy, JWT.
-- **Frontend**: React, TypeScript, Vite.
-- **AI (Deep Learning)**: PhoBERT (Transformers, PyTorch).
-- **AI (Traditional ML)**: TF-IDF + LinearSVC + CalibratedClassifierCV.
+Vietnamese sentiment analysis system with 3 classes: Negative, Neutral, Positive.
+The project includes a FastAPI backend and a React + Vite frontend.
 
----
+### Live Demo
+- Frontend (Vercel): https://sentiment-ai-rho.vercel.app/
 
-## 🚀 Hướng Dẫn Chạy Dự Án Nhanh
+### Tech Stack
+- Backend: FastAPI, SQLAlchemy (async), PostgreSQL, JWT, Google OAuth
+- Frontend: React, TypeScript, Vite
+- AI: PhoBERT-based model (in models/) and research notebooks (in notebooks/)
 
-### 1) Chuẩn bị Database
-- Tạo DB trống (ví dụ: `sentiment_db`).
-- Chạy file `PostgreSQL AI Sentiment_Vietnamese.sql` để tạo bảng.
+### Quick Start
 
-### 2) Chạy Backend
-Lần đầu:
+1) Database setup
+- Create a PostgreSQL database (example: sentiment_db)
+- Run PostgreSQL AI Sentiment_Vietnamese.sql
+
+2) Run backend
+First time only:
 ```bash
 cd backend
 python -m venv .venv
@@ -25,37 +28,74 @@ python -m venv .venv
 pip install -r requirements.txt
 copy .env.example .env
 ```
-Mỗi lần demo:
+
+Every time you start backend:
 ```bash
 cd backend
 .venv\Scripts\activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
-API Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+- API docs: http://localhost:8000/docs
 
-### 3) Chạy Frontend
+3) Run frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-Web: [http://localhost:5173](http://localhost:5173)
+- Local frontend: http://localhost:5173
+
+### Notes
+- Update backend and frontend environment variables from .env.example files.
+- Ensure model files are available in models/ before running AI inference.
 
 ---
 
-## 🧠 Huấn Luyện AI Mô Hình (Phần Dành Cho Nghiên Cứu)
+## Tiếng Việt
 
-Nếu bạn muốn train lại hoặc xem pipeline huấn luyện, hãy mở các notebook trong thư mục `notebooks/`.
+Hệ thống phân tích cảm xúc tiếng Việt với 3 nhãn: Tiêu cực, Trung tính, Tích cực.
+Dự án gồm backend FastAPI và frontend React + Vite.
 
-### PhoBERT (Deep Learning)
+### Bản chạy thực tế
+- Frontend (Vercel): https://sentiment-ai-rho.vercel.app/
 
-1. 🟢 **`phobert-v1-1st.ipynb`**: Bản baseline đầu tiên.
-2. 🟡 **`phobert-v1-2nd.ipynb`**: Fine-tune tiếp từ bản v1.
-3. 🔴 **`phobert-v2.ipynb`**: Phiên bản cải tiến với pipeline mới.
-4. 🟣 **`phobert-v2.1.ipynb`**: Phiên bản tối ưu thêm từ v2.
+### Công nghệ chính
+- Backend: FastAPI, SQLAlchemy async, PostgreSQL, JWT, Google OAuth
+- Frontend: React, TypeScript, Vite
+- AI: mô hình PhoBERT (thư mục models/) và notebook nghiên cứu (thư mục notebooks/)
 
-### Traditional ML
+### Chạy nhanh dự án
 
-5. 🔵 **`TFIDF-SVM-v1.ipynb`**: Mô hình TF-IDF + SVM để làm mốc so sánh với PhoBERT.
+1) Chuẩn bị cơ sở dữ liệu
+- Tạo PostgreSQL database (ví dụ: sentiment_db)
+- Chạy file PostgreSQL AI Sentiment_Vietnamese.sql
 
-**💡 Lưu ý:** PhoBERT nên chạy bằng GPU (khuyên dùng Colab); TF-IDF SVM chạy CPU được.
+2) Chạy backend
+Lần đầu tiên:
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+```
+
+Mỗi lần chạy backend:
+```bash
+cd backend
+.venv\Scripts\activate
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+- API docs: http://localhost:8000/docs
+
+3) Chạy frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+- Frontend local: http://localhost:5173
+
+### Ghi chú
+- Cập nhật biến môi trường theo các file .env.example.
+- Đảm bảo model trong thư mục models/ sẵn sàng trước khi chạy suy luận AI.
