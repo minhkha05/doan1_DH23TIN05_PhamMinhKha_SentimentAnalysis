@@ -35,6 +35,16 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
+def is_supported_password_hash(hashed_password: str | None) -> bool:
+    """Return True if the stored password uses a supported hash format."""
+    if not hashed_password:
+        return False
+    try:
+        return pwd_context.identify(hashed_password) is not None
+    except (ValueError, TypeError):
+        return False
+
+
 # ── JWT Token ─────────────────────────────────────────────
 def create_access_token(
     data: dict,

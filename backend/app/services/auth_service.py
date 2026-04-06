@@ -3,6 +3,7 @@ Authentication service – register, login, user retrieval.
 Uses Repository/Service pattern to keep business logic separate from routes.
 """
 
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -15,8 +16,16 @@ from app.core.exceptions import (
     NotFoundException,
     UnauthorizedException,
 )
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    hash_password,
+    is_supported_password_hash,
+    verify_password,
+)
 from app.models.models import DangNhap, TaiKhoan, VaiTro
+
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -102,7 +111,20 @@ class AuthService:
         if not user:
             raise UnauthorizedException(detail="Tài khoản không tồn tại.")
 
-        if not verify_password(matkhau, user.tk_matkhau):
+        password_ok = verify_password(matkhau, user.tk_matkhau)
+
+        # One-time migration path for legacy plaintext passwords stored in old data.
+        if not password_ok and not is_supported_password_hash(user.tk_matkhau):
+            if user.tk_matkhau == matkhau:
+                user.tk_matkhau = hash_password(matkhau)
+                await self.db.flush()
+                password_ok = True
+                logger.warning(
+                    "Upgraded legacy plaintext password to bcrypt for tk_id=%s",
+                    user.tk_id,
+                )
+
+        if not password_ok:
             raise UnauthorizedException(detail="Mật khẩu không chính xác.")
 
         # Update last login timestamp
