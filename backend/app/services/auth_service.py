@@ -111,14 +111,14 @@ class AuthService:
         if not user:
             raise UnauthorizedException(detail="Tài khoản không tồn tại.")
 
-        password_ok = verify_password(matkhau, user.tk_matkhau)
-
-        # One-time migration path for legacy plaintext passwords stored in old data.
-        if not password_ok and not is_supported_password_hash(user.tk_matkhau):
-            if user.tk_matkhau == matkhau:
+        if is_supported_password_hash(user.tk_matkhau):
+            password_ok = verify_password(matkhau, user.tk_matkhau)
+        else:
+            # One-time migration path for legacy plaintext passwords stored in old data.
+            password_ok = user.tk_matkhau == matkhau
+            if password_ok:
                 user.tk_matkhau = hash_password(matkhau)
                 await self.db.flush()
-                password_ok = True
                 logger.warning(
                     "Upgraded legacy plaintext password to bcrypt for tk_id=%s",
                     user.tk_id,

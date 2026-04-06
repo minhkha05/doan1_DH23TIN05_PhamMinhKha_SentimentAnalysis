@@ -31,7 +31,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
         return pwd_context.verify(plain_password, hashed_password)
     except (UnknownHashError, ValueError, TypeError):
-        logger.warning("Encountered unsupported password hash format during login verification.")
         return False
 
 
