@@ -29,6 +29,10 @@ _smtp_disabled_until: datetime | None = None
 _reset_codes: Dict[str, Tuple[str, datetime]] = {}
 
 
+class EmailDeliveryError(RuntimeError):
+    """Raised when OTP email cannot be delivered by any configured provider."""
+
+
 def generate_code(length: int = 6) -> str:
     """Generate a random numeric verification code."""
     return ''.join(random.choices(string.digits, k=length))
@@ -187,18 +191,26 @@ async def send_reset_email(to_email: str, code: str):
         # Console fallback for debug/dev when external providers fail.
         print(f"RESET CODE for {to_email}: {code}")
 
-    if provider == "resend":
+    async def _attempt_resend() -> bool:
+        if not resend_available:
+            return False
         try:
             await _send_email_via_resend(to_email, subject, html, from_name, smtp_user)
             logger.info("Password reset email sent via Resend to %s", to_email)
-            return
+            return True
         except Exception as e:
             logger.error("Resend send failed for %s: %s", to_email, e)
-            await _print_fallback_code()
-            return
+            return False
 
-    smtp_temporarily_disabled = _is_smtp_temporarily_disabled()
-    if smtp_available and not smtp_temporarily_disabled:
+    async def _attempt_smtp() -> bool:
+        if not smtp_available:
+            logger.warning("SMTP credentials are not configured. Skipping SMTP provider.")
+            return False
+
+        if _is_smtp_temporarily_disabled():
+            logger.warning("Skipping SMTP attempt because it is temporarily disabled after recent network failures.")
+            return False
+
         try:
             await asyncio.wait_for(
                 asyncio.to_thread(
@@ -212,26 +224,35 @@ async def send_reset_email(to_email: str, code: str):
                 ),
                 timeout=10,
             )
-            logger.info("Password reset email sent successfully to %s", to_email)
-            return
+            logger.info("Password reset email sent via SMTP to %s", to_email)
+            return True
         except OSError as e:
             logger.error("SMTP send failed for %s: %s", to_email, e)
             if getattr(e, "errno", None) == 101:
                 _disable_smtp_temporarily(minutes=15)
                 logger.warning("SMTP disabled for 15 minutes due to network unreachable (Errno 101).")
+            return False
         except Exception as e:
             logger.error("SMTP send failed for %s: %s", to_email, e)
-    elif smtp_temporarily_disabled:
-        logger.warning("Skipping SMTP attempt because it is temporarily disabled after recent network failures.")
-    elif provider == "smtp":
-        logger.error("SMTP provider selected but SMTP_USER/SMTP_PASSWORD is not configured.")
+            return False
 
-    if resend_available and provider in {"auto", "smtp"}:
-        try:
-            await _send_email_via_resend(to_email, subject, html, from_name, smtp_user)
-            logger.info("Password reset email sent via Resend fallback to %s", to_email)
+    send_order: list[str]
+    if provider == "resend":
+        send_order = ["resend"]
+    elif provider == "smtp":
+        # Allow HTTPS fallback for production runtimes where SMTP ports are blocked.
+        send_order = ["smtp", "resend"]
+    else:
+        # auto mode: prefer HTTPS provider first for faster and more reliable cloud runtime.
+        send_order = ["resend", "smtp"] if resend_available else ["smtp", "resend"]
+
+    for channel in send_order:
+        if channel == "resend" and await _attempt_resend():
             return
-        except Exception as e:
-            logger.error("Resend fallback failed for %s: %s", to_email, e)
+        if channel == "smtp" and await _attempt_smtp():
+            return
 
     await _print_fallback_code()
+    raise EmailDeliveryError(
+        "Không thể gửi email xác thực. Vui lòng cấu hình RESEND_API_KEY và RESEND_FROM_EMAIL trên server."
+    )

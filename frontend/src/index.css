@@ -218,6 +218,7 @@ html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100%;
 }
 
 body {
@@ -227,6 +228,7 @@ body {
   color: var(--text-primary);
   background: var(--bg-body);
   min-height: 100vh;
+  min-height: 100dvh;
   transition: background var(--transition-slow), color var(--transition-slow);
 }
 
@@ -291,6 +293,7 @@ html.performance-lite body::after {
   position: relative;
   z-index: 1;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 a {
@@ -639,6 +642,7 @@ select {
 .table-container {
   overflow-x: auto;
   border-radius: var(--radius-lg);
+  -webkit-overflow-scrolling: touch;
 }
 
 .table {
@@ -1065,6 +1069,29 @@ html.app-first-paint .stagger-6 {
 @media (max-width: 768px) {
   :root {
     --sidebar-width: 100%;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .btn {
+    min-height: 44px;
+  }
+
+  .btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .glass-card,
+  .glass-card-static {
+    border-radius: var(--radius-lg);
+  }
+
+  .page-loader {
+    min-height: 45vh;
+    padding: var(--space-4);
   }
 }
 

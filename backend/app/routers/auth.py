@@ -3,7 +3,6 @@ Auth router – /api/v1/auth
 Endpoints: register, login, profile, forgot-password, verify-reset-code, reset-password
 """
 
-import asyncio
 import logging
 from urllib.parse import urlencode
 
@@ -144,7 +143,13 @@ async def forgot_password(
     body: ForgotPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    from app.services.email_service import generate_code, store_code, send_reset_email
+    from app.services.email_service import (
+        EmailDeliveryError,
+        consume_code,
+        generate_code,
+        send_reset_email,
+        store_code,
+    )
 
     email = body.email.strip().lower()
 
@@ -156,10 +161,13 @@ async def forgot_password(
 
     code = generate_code()
     store_code(email, code)
-    # Do not block response on external email providers to keep demo runtime fast.
-    asyncio.create_task(send_reset_email(email, code))
+    try:
+        await send_reset_email(email, code)
+    except EmailDeliveryError as exc:
+        consume_code(email)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    return {"message": "Mã xác thực đang được gửi. Vui lòng kiểm tra email và thư mục spam."}
+    return {"message": "Mã xác thực đã được gửi. Vui lòng kiểm tra email và thư mục spam."}
 
 
 # ══════════════════════════════════════════════════════════

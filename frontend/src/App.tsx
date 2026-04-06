@@ -76,13 +76,30 @@ const OAuthQueryBridge: React.FC = () => {
 
 const App: React.FC = () => {
   useEffect(() => {
+    const isPerformanceLite = document.documentElement.classList.contains('performance-lite');
+    const isMobileViewport = window.matchMedia('(max-width: 900px)').matches;
+    if (isPerformanceLite || isMobileViewport) {
+      return;
+    }
+
     const preloaders = [
       () => import('./pages/user/HomePage'),
       () => import('./pages/user/HistoryPage'),
-      () => import('./pages/admin/DashboardPage'),
-      () => import('./pages/admin/UsersPage'),
-      () => import('./pages/admin/ExportPage'),
+      () => import('./pages/user/ProfilePage'),
     ];
+
+    try {
+      const rawUser = localStorage.getItem('user');
+      const storedRole = rawUser ? JSON.parse(rawUser)?.vaitro : undefined;
+      if (storedRole === 'admin') {
+        preloaders.push(
+          () => import('./pages/admin/DashboardPage'),
+          () => import('./pages/admin/UsersPage'),
+        );
+      }
+    } catch {
+      // Ignore malformed localStorage user payload.
+    }
 
     const runPrefetch = () => {
       for (const load of preloaders) {
