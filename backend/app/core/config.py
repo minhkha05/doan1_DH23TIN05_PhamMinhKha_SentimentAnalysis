@@ -36,6 +36,13 @@ def _sanitize_and_validate_database_url(raw_value: object) -> str:
     cleaned = original.strip().strip('"').strip("'")
     cleaned = _CONTROL_CHAR_PATTERN.sub("", cleaned).strip()
 
+    if cleaned.startswith("postgres://"):
+        cleaned = "postgresql+asyncpg://" + cleaned[len("postgres://"):]
+        logger.warning("DATABASE_URL scheme postgres:// was auto-normalized to postgresql+asyncpg://")
+    elif cleaned.startswith("postgresql://"):
+        cleaned = "postgresql+asyncpg://" + cleaned[len("postgresql://"):]
+        logger.warning("DATABASE_URL scheme postgresql:// was auto-normalized to postgresql+asyncpg://")
+
     if cleaned != original:
         logger.warning(
             "DATABASE_URL contained hidden/extra characters and was sanitized before use."
