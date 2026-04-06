@@ -3,8 +3,59 @@ Application configuration using Pydantic Settings.
 Loads environment variables from .env file.
 """
 
-from pydantic_settings import BaseSettings
+import logging
+import re
 from functools import lru_cache
+from urllib.parse import urlsplit
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
+
+
+logger = logging.getLogger(__name__)
+_CONTROL_CHAR_PATTERN = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _mask_database_url(url: str) -> str:
+    """Return a safe representation of DATABASE_URL for logs."""
+    parsed = urlsplit(url)
+    host = parsed.hostname or "unknown-host"
+    port = parsed.port or "?"
+    db_name = parsed.path.lstrip("/") or "unknown-db"
+    user = parsed.username or "unknown-user"
+    return f"{parsed.scheme}://{user}:***@{host}:{port}/{db_name}"
+
+
+def _sanitize_and_validate_database_url(raw_value: object) -> str:
+    """Normalize DATABASE_URL and fail fast on malformed values."""
+    if raw_value is None:
+        raise ValueError("DATABASE_URL is required.")
+
+    original = str(raw_value)
+    cleaned = original.strip().strip('"').strip("'")
+    cleaned = _CONTROL_CHAR_PATTERN.sub("", cleaned).strip()
+
+    if cleaned != original:
+        logger.warning(
+            "DATABASE_URL contained hidden/extra characters and was sanitized before use."
+        )
+
+    parsed = urlsplit(cleaned)
+    if parsed.scheme != "postgresql+asyncpg":
+        raise ValueError("DATABASE_URL must use 'postgresql+asyncpg' scheme.")
+    if not parsed.hostname:
+        raise ValueError("DATABASE_URL must include a hostname.")
+
+    database_name = parsed.path.lstrip("/")
+    if not database_name:
+        raise ValueError("DATABASE_URL must include a database name in path.")
+    if any(ch.isspace() for ch in database_name):
+        raise ValueError(
+            "DATABASE_URL database name contains whitespace/newline characters."
+        )
+
+    logger.info("DATABASE_URL validated: %s", _mask_database_url(cleaned))
+    return cleaned
 
 
 class Settings(BaseSettings):
@@ -33,6 +84,11 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM_NAME: str = "SentimentAI"
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def sanitize_database_url(cls, value: object) -> str:
+        return _sanitize_and_validate_database_url(value)
 
     model_config = {
         "env_file": ".env",
