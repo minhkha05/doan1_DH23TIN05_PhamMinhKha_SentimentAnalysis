@@ -6,6 +6,7 @@ Loads environment variables from .env file.
 import logging
 import re
 from functools import lru_cache
+from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import field_validator
@@ -35,6 +36,13 @@ def _sanitize_and_validate_database_url(raw_value: object) -> str:
     cleaned = original.strip().strip('"').strip("'")
     cleaned = _CONTROL_CHAR_PATTERN.sub("", cleaned).strip()
 
+    if cleaned.startswith("postgres://"):
+        cleaned = "postgresql+asyncpg://" + cleaned[len("postgres://"):]
+        logger.warning("DATABASE_URL scheme postgres:// was auto-normalized to postgresql+asyncpg://")
+    elif cleaned.startswith("postgresql://"):
+        cleaned = "postgresql+asyncpg://" + cleaned[len("postgresql://"):]
+        logger.warning("DATABASE_URL scheme postgresql:// was auto-normalized to postgresql+asyncpg://")
+
     if cleaned != original:
         logger.warning(
             "DATABASE_URL contained hidden/extra characters and was sanitized before use."
@@ -61,6 +69,8 @@ def _sanitize_and_validate_database_url(raw_value: object) -> str:
 class Settings(BaseSettings):
     # ── Database ──────────────────────────────────────────
     DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/sentiment_db"
+    DB_SSL_MODE: Literal["auto", "disable", "require", "verify-full"] = "auto"
+    DB_SSL_CA_FILE: str = ""
 
     # ── JWT Authentication ────────────────────────────────
     SECRET_KEY: str = "your-super-secret-key-change-in-production"
@@ -84,11 +94,29 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM_NAME: str = "SentimentAI"
+    EMAIL_PROVIDER: Literal["smtp", "resend", "auto"] = "smtp"
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = ""
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def sanitize_database_url(cls, value: object) -> str:
         return _sanitize_and_validate_database_url(value)
+
+    @field_validator("DB_SSL_MODE", mode="before")
+    @classmethod
+    def normalize_db_ssl_mode(cls, value: object) -> str:
+        return str(value).strip().lower()
+
+    @field_validator("DB_SSL_CA_FILE", mode="before")
+    @classmethod
+    def normalize_db_ssl_ca_file(cls, value: object) -> str:
+        return str(value).strip().strip('"').strip("'")
+
+    @field_validator("EMAIL_PROVIDER", mode="before")
+    @classmethod
+    def normalize_email_provider(cls, value: object) -> str:
+        return str(value).strip().lower()
 
     model_config = {
         "env_file": ".env",

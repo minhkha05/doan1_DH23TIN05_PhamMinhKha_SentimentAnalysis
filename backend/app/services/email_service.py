@@ -11,6 +11,7 @@ import ssl
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Tuple
 
+import httpx
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -72,12 +73,49 @@ def _send_email_sync(
         server.sendmail(smtp_user, to_email, msg.as_string())
 
 
+async def _send_email_via_resend(
+    to_email: str,
+    subject: str,
+    html: str,
+    from_name: str,
+    default_sender: str,
+):
+    """Send email through Resend API over HTTPS (port 443)."""
+    settings = get_settings()
+    api_key = (settings.RESEND_API_KEY or "").strip()
+    from_email = (settings.RESEND_FROM_EMAIL or default_sender or "").strip()
+
+    if not api_key:
+        raise RuntimeError("RESEND_API_KEY is not configured.")
+    if not from_email:
+        raise RuntimeError("RESEND_FROM_EMAIL (or SMTP_USER) is required for Resend provider.")
+
+    payload = {
+        "from": f"{from_name} <{from_email}>",
+        "to": [to_email],
+        "subject": subject,
+        "html": html,
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    timeout = httpx.Timeout(connect=8.0, read=12.0, write=12.0, pool=8.0)
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.post("https://api.resend.com/emails", json=payload, headers=headers)
+
+    if resp.status_code not in (200, 202):
+        raise RuntimeError(f"Resend API failed: status={resp.status_code}, body={resp.text}")
+
+
 async def send_reset_email(to_email: str, code: str):
     """
-    Send password reset verification code via SMTP.
-    
-    Requires these env vars:
-      SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_NAME
+    Send password reset verification code via configured provider.
+
+    Supports two providers:
+      - SMTP (default): SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_NAME
+      - Resend API: EMAIL_PROVIDER=resend|auto, RESEND_API_KEY, RESEND_FROM_EMAIL
     """
     settings = get_settings()
     smtp_host = settings.SMTP_HOST
@@ -85,16 +123,18 @@ async def send_reset_email(to_email: str, code: str):
     smtp_user = settings.SMTP_USER
     smtp_password = settings.SMTP_PASSWORD
     from_name = settings.SMTP_FROM_NAME
+    provider = (settings.EMAIL_PROVIDER or "smtp").strip().lower()
+    if provider not in {"smtp", "resend", "auto"}:
+        logger.warning("Unknown EMAIL_PROVIDER=%s. Falling back to smtp.", provider)
+        provider = "smtp"
 
-    if not smtp_user or not smtp_password:
-        # Fallback: just log to console in dev mode
-        print(f"\n{'='*50}")
-        print(f"RESET CODE for {to_email}: {code}")
-        print(f"{'='*50}\n")
-        return
+    smtp_available = bool(smtp_user and smtp_password)
+    resend_available = bool((settings.RESEND_API_KEY or "").strip())
+
+    subject = f"[SentimentAI] Mã xác thực đặt lại mật khẩu: {code}"
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"[SentimentAI] Mã xác thực đặt lại mật khẩu: {code}"
+    msg["Subject"] = subject
     msg["From"] = f"{from_name} <{smtp_user}>"
     msg["To"] = to_email
 
@@ -123,21 +163,47 @@ async def send_reset_email(to_email: str, code: str):
 
     msg.attach(MIMEText(html, "html"))
 
-    try:
-        await asyncio.wait_for(
-            asyncio.to_thread(
-                _send_email_sync,
-                smtp_host,
-                smtp_port,
-                smtp_user,
-                smtp_password,
-                to_email,
-                msg,
-            ),
-            timeout=20,
-        )
-        logger.info("Password reset email sent successfully to %s", to_email)
-    except Exception as e:
-        logger.error("Email send failed for %s: %s", to_email, e)
-        # Still print code to console as fallback
-        print(f"📧 RESET CODE for {to_email}: {code}")
+    async def _print_fallback_code():
+        # Console fallback for debug/dev when external providers fail.
+        print(f"RESET CODE for {to_email}: {code}")
+
+    if provider == "resend":
+        try:
+            await _send_email_via_resend(to_email, subject, html, from_name, smtp_user)
+            logger.info("Password reset email sent via Resend to %s", to_email)
+            return
+        except Exception as e:
+            logger.error("Resend send failed for %s: %s", to_email, e)
+            await _print_fallback_code()
+            return
+
+    if smtp_available:
+        try:
+            await asyncio.wait_for(
+                asyncio.to_thread(
+                    _send_email_sync,
+                    smtp_host,
+                    smtp_port,
+                    smtp_user,
+                    smtp_password,
+                    to_email,
+                    msg,
+                ),
+                timeout=20,
+            )
+            logger.info("Password reset email sent successfully to %s", to_email)
+            return
+        except Exception as e:
+            logger.error("SMTP send failed for %s: %s", to_email, e)
+    elif provider == "smtp":
+        logger.error("SMTP provider selected but SMTP_USER/SMTP_PASSWORD is not configured.")
+
+    if provider == "auto" and resend_available:
+        try:
+            await _send_email_via_resend(to_email, subject, html, from_name, smtp_user)
+            logger.info("Password reset email sent via Resend fallback to %s", to_email)
+            return
+        except Exception as e:
+            logger.error("Resend fallback failed for %s: %s", to_email, e)
+
+    await _print_fallback_code()
