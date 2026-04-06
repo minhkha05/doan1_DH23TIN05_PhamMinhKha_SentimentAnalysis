@@ -3,10 +3,10 @@
    ═══════════════════════════════════════════════════ */
 
 import React, { Suspense, lazy, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './components/guards/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
@@ -38,6 +38,41 @@ const RouteFallback: React.FC = () => (
     <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>Đang tải trang...</span>
   </div>
 );
+
+const OAuthQueryBridge: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+    const tokenType = params.get('token_type');
+    const vaitro = params.get('vaitro');
+    const tkId = params.get('tk_id');
+
+    const hasOAuthPayload = Boolean(token || tokenType || vaitro || tkId || params.get('oauth'));
+    if (!hasOAuthPayload) return;
+
+    const parsedTkId = Number(tkId);
+    const isValidRole = vaitro === 'user' || vaitro === 'admin';
+
+    if (token && tokenType === 'bearer' && isValidRole && Number.isFinite(parsedTkId)) {
+      login({
+        access_token: token,
+        token_type: tokenType,
+        vaitro: vaitro as 'user' | 'admin',
+        tk_id: parsedTkId,
+      });
+      navigate(vaitro === 'admin' ? '/admin/dashboard' : '/home', { replace: true });
+      return;
+    }
+
+    navigate('/login', { replace: true });
+  }, [location.search, login, navigate]);
+
+  return null;
+};
 
 const App: React.FC = () => {
   useEffect(() => {
@@ -73,6 +108,7 @@ const App: React.FC = () => {
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
+          <OAuthQueryBridge />
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               {/* ── Public routes ─────────────────────── */}

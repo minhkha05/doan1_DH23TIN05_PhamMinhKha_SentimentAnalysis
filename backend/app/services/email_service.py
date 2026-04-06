@@ -21,6 +21,9 @@ from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+# Temporarily disable SMTP attempts after hard network failures (for demo stability).
+_smtp_disabled_until: datetime | None = None
+
 # ── In-memory code store (production: use Redis/database) ──
 # Key: email, Value: (code, expiry_datetime)
 _reset_codes: Dict[str, Tuple[str, datetime]] = {}
@@ -55,6 +58,23 @@ def consume_code(email: str):
     _reset_codes.pop(email.lower(), None)
 
 
+def _is_smtp_temporarily_disabled() -> bool:
+    global _smtp_disabled_until
+    if not _smtp_disabled_until:
+        return False
+
+    if datetime.now(timezone.utc) >= _smtp_disabled_until:
+        _smtp_disabled_until = None
+        return False
+
+    return True
+
+
+def _disable_smtp_temporarily(minutes: int = 10):
+    global _smtp_disabled_until
+    _smtp_disabled_until = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+
+
 def _send_email_sync(
     smtp_host: str,
     smtp_port: int,
@@ -65,7 +85,7 @@ def _send_email_sync(
 ):
     """Blocking SMTP send operation executed in a worker thread."""
     tls_context = ssl.create_default_context()
-    with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+    with smtplib.SMTP(smtp_host, smtp_port, timeout=8) as server:
         server.ehlo()
         server.starttls(context=tls_context)
         server.ehlo()
@@ -123,10 +143,10 @@ async def send_reset_email(to_email: str, code: str):
     smtp_user = settings.SMTP_USER
     smtp_password = settings.SMTP_PASSWORD
     from_name = settings.SMTP_FROM_NAME
-    provider = (settings.EMAIL_PROVIDER or "smtp").strip().lower()
+    provider = (settings.EMAIL_PROVIDER or "auto").strip().lower()
     if provider not in {"smtp", "resend", "auto"}:
-        logger.warning("Unknown EMAIL_PROVIDER=%s. Falling back to smtp.", provider)
-        provider = "smtp"
+        logger.warning("Unknown EMAIL_PROVIDER=%s. Falling back to auto.", provider)
+        provider = "auto"
 
     smtp_available = bool(smtp_user and smtp_password)
     resend_available = bool((settings.RESEND_API_KEY or "").strip())
@@ -177,7 +197,8 @@ async def send_reset_email(to_email: str, code: str):
             await _print_fallback_code()
             return
 
-    if smtp_available:
+    smtp_temporarily_disabled = _is_smtp_temporarily_disabled()
+    if smtp_available and not smtp_temporarily_disabled:
         try:
             await asyncio.wait_for(
                 asyncio.to_thread(
@@ -189,16 +210,23 @@ async def send_reset_email(to_email: str, code: str):
                     to_email,
                     msg,
                 ),
-                timeout=20,
+                timeout=10,
             )
             logger.info("Password reset email sent successfully to %s", to_email)
             return
+        except OSError as e:
+            logger.error("SMTP send failed for %s: %s", to_email, e)
+            if getattr(e, "errno", None) == 101:
+                _disable_smtp_temporarily(minutes=15)
+                logger.warning("SMTP disabled for 15 minutes due to network unreachable (Errno 101).")
         except Exception as e:
             logger.error("SMTP send failed for %s: %s", to_email, e)
+    elif smtp_temporarily_disabled:
+        logger.warning("Skipping SMTP attempt because it is temporarily disabled after recent network failures.")
     elif provider == "smtp":
         logger.error("SMTP provider selected but SMTP_USER/SMTP_PASSWORD is not configured.")
 
-    if provider == "auto" and resend_available:
+    if resend_available and provider in {"auto", "smtp"}:
         try:
             await _send_email_via_resend(to_email, subject, html, from_name, smtp_user)
             logger.info("Password reset email sent via Resend fallback to %s", to_email)

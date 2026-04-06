@@ -94,7 +94,7 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM_NAME: str = "SentimentAI"
-    EMAIL_PROVIDER: Literal["smtp", "resend", "auto"] = "smtp"
+    EMAIL_PROVIDER: Literal["smtp", "resend", "auto"] = "auto"
     RESEND_API_KEY: str = ""
     RESEND_FROM_EMAIL: str = ""
 
