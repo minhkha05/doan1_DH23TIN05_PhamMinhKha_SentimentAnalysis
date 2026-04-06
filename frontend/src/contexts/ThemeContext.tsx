@@ -2,7 +2,7 @@
    Theme Context – global dark/light mode
    ═══════════════════════════════════════════════════ */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 
 type Theme = 'light' | 'dark';
 
@@ -30,8 +30,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
     }, []);
 
+    const contextValue = useMemo(
+        () => ({ theme, toggleTheme, isDark: theme === 'dark' }),
+        [theme, toggleTheme],
+    );
+
     return (
-        <ThemeContext.Provider value={{ theme, toggleTheme, isDark: theme === 'dark' }}>
+        <ThemeContext.Provider value={contextValue}>
             {children}
         </ThemeContext.Provider>
     );

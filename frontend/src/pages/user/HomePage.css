@@ -271,6 +271,28 @@
 }
 
 @media (max-width: 768px) {
+    .home-header h1 {
+        font-size: var(--text-2xl);
+        align-items: flex-start;
+    }
+
+    .home-input-section,
+    .home-result-card,
+    .home-batch-card {
+        padding: var(--space-5);
+    }
+
+    .home-result-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-2);
+    }
+
+    .home-result-meta {
+        flex-wrap: wrap;
+        gap: var(--space-2);
+    }
+
     .home-input-actions {
         flex-direction: column;
     }
@@ -283,5 +305,15 @@
     .home-batch-controls {
         flex-direction: column;
         align-items: stretch;
+    }
+}
+
+@media (max-width: 480px) {
+    .home-page {
+        max-width: 100%;
+    }
+
+    .home-batch-cell-text {
+        max-width: 240px;
     }
 }

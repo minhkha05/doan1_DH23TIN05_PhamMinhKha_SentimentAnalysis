@@ -2,7 +2,7 @@
    Auth Context – global authentication state
    ═══════════════════════════════════════════════════ */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { TokenResponse, UserProfile, VaiTro } from '../types';
 import { authService } from '../services/authService';
 
@@ -87,8 +87,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
     }, []);
 
+    const contextValue = useMemo(
+        () => ({ ...state, login, logout, refreshProfile }),
+        [state, login, logout, refreshProfile],
+    );
+
     return (
-        <AuthContext.Provider value={{ ...state, login, logout, refreshProfile }}>
+        <AuthContext.Provider value={contextValue}>
             {children}
         </AuthContext.Provider>
     );

@@ -4,6 +4,7 @@
 
 .landing {
     min-height: 100vh;
+    min-height: 100dvh;
     overflow-x: hidden;
 }
 
@@ -23,7 +24,7 @@
 .landing-nav-inner {
     max-width: 1200px;
     margin: 0 auto;
-    padding: var(--space-4) var(--space-6);
+    padding: calc(var(--space-3) + env(safe-area-inset-top)) calc(var(--space-4) + env(safe-area-inset-right)) var(--space-3) calc(var(--space-4) + env(safe-area-inset-left));
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -68,6 +69,7 @@
     align-items: center;
     justify-content: center;
     min-height: 90vh;
+    min-height: 90dvh;
     padding: calc(var(--header-height) + var(--space-16)) var(--space-6) var(--space-16);
     text-align: center;
 }
@@ -278,14 +280,44 @@
 
 /* ── Responsive ─────────────────────────────────── */
 @media (max-width: 768px) {
+    .landing-nav-inner {
+        padding: calc(var(--space-2) + env(safe-area-inset-top)) calc(var(--space-3) + env(safe-area-inset-right)) var(--space-2) calc(var(--space-3) + env(safe-area-inset-left));
+    }
+
+    .landing-hero {
+        min-height: 84dvh;
+        padding: calc(var(--header-height) + var(--space-10)) var(--space-4) var(--space-10);
+    }
+
+    .landing-glow {
+        width: 360px;
+        height: 360px;
+    }
+
+    .landing-hero-content {
+        max-width: 100%;
+    }
+
+    .landing-hero-desc {
+        font-size: var(--text-base);
+        margin-bottom: var(--space-6);
+    }
+
     .landing-hero-actions {
         flex-direction: column;
+        width: 100%;
+        gap: var(--space-3);
+    }
+
+    .landing-hero-actions .btn {
+        width: 100%;
     }
 
     .landing-hero-stats {
         flex-direction: column;
         gap: var(--space-3);
         padding: var(--space-4);
+        width: 100%;
     }
 
     .landing-stat-divider {
@@ -295,5 +327,31 @@
 
     .landing-nav-actions .btn-ghost {
         display: none;
+    }
+
+    .landing-features {
+        padding: var(--space-10) var(--space-4);
+    }
+
+    .landing-cta {
+        padding: var(--space-4) var(--space-4) var(--space-10);
+    }
+
+    .landing-cta-card {
+        padding: var(--space-8) var(--space-5);
+    }
+}
+
+@media (max-width: 480px) {
+    .landing-brand-text {
+        font-size: var(--text-base);
+    }
+
+    .landing-section-header h2 {
+        font-size: var(--text-2xl);
+    }
+
+    .landing-section-header p {
+        font-size: var(--text-base);
     }
 }

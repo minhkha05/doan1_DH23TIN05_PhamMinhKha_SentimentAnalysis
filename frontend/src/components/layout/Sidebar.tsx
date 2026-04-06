@@ -2,7 +2,7 @@
    Sidebar layout component
    ═══════════════════════════════════════════════════ */
 
-import React, { useState } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
     HiOutlineHome,
@@ -26,52 +26,95 @@ import logoImg from '../../assets/logo sentiment.png';
 import '../../pages/public/AuthPages.css'; // for confirm-overlay styles
 import './Sidebar.css';
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+    collapsed: boolean;
+    mobileOpen: boolean;
+    isMobile: boolean;
+    onToggleCollapsed: () => void;
+    onToggleMobile: () => void;
+    onCloseMobile: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({
+    collapsed,
+    mobileOpen,
+    isMobile,
+    onToggleCollapsed,
+    onToggleMobile,
+    onCloseMobile,
+}) => {
     const { role, user, logout } = useAuth();
     const { isDark, toggleTheme } = useTheme();
     const navigate = useNavigate();
-    const [collapsed, setCollapsed] = useState(false);
-    const [mobileOpen, setMobileOpen] = useState(false);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-    const handleLogout = () => {
+    const handleLogout = useCallback(() => {
         setShowLogoutConfirm(false);
+        onCloseMobile();
         logout();
         navigate('/login');
-    };
+    }, [logout, navigate, onCloseMobile]);
 
-    const userLinks = [
-        { to: '/home', icon: <HiOutlineHome />, label: 'Phân tích' },
-        { to: '/history', icon: <HiOutlineClock />, label: 'Lịch sử' },
-        { to: '/profile', icon: <HiOutlineUser />, label: 'Hồ sơ' },
-    ];
+    const userLinks = useMemo(
+        () => [
+            { to: '/home', icon: <HiOutlineHome />, label: 'Phân tích' },
+            { to: '/history', icon: <HiOutlineClock />, label: 'Lịch sử' },
+            { to: '/profile', icon: <HiOutlineUser />, label: 'Hồ sơ' },
+        ],
+        [],
+    );
 
-    const adminLinks = [
-        { to: '/admin/dashboard', icon: <HiOutlineChartBar />, label: 'Dashboard' },
-        { to: '/admin/users', icon: <HiOutlineUsers />, label: 'Người dùng' },
-        { to: '/admin/texts', icon: <HiOutlineDocumentText />, label: 'Văn bản' },
-        { to: '/admin/labels', icon: <HiOutlineTag />, label: 'Nhãn cảm xúc' },
-        { to: '/admin/test-model', icon: <HiOutlineBeaker />, label: 'Test Model' },
-        { to: '/admin/export', icon: <HiOutlineArrowDownTray />, label: 'Xuất dữ liệu' },
-    ];
+    const adminLinks = useMemo(
+        () => [
+            { to: '/admin/dashboard', icon: <HiOutlineChartBar />, label: 'Dashboard' },
+            { to: '/admin/users', icon: <HiOutlineUsers />, label: 'Người dùng' },
+            { to: '/admin/texts', icon: <HiOutlineDocumentText />, label: 'Văn bản' },
+            { to: '/admin/labels', icon: <HiOutlineTag />, label: 'Nhãn cảm xúc' },
+            { to: '/admin/test-model', icon: <HiOutlineBeaker />, label: 'Test Model' },
+            { to: '/admin/export', icon: <HiOutlineArrowDownTray />, label: 'Xuất dữ liệu' },
+        ],
+        [],
+    );
+
+    const userInitial = useMemo(
+        () => (user?.tk_email?.[0] || user?.tk_sdt?.[0] || 'U').toUpperCase(),
+        [user?.tk_email, user?.tk_sdt],
+    );
+
+    const userDisplay = useMemo(() => user?.tk_email || user?.tk_sdt || 'User', [user?.tk_email, user?.tk_sdt]);
+
+    const handleNavClick = useCallback(() => {
+        if (mobileOpen) {
+            onCloseMobile();
+        }
+    }, [mobileOpen, onCloseMobile]);
+
+    const handleThemeToggle = useCallback(() => {
+        toggleTheme();
+        if (mobileOpen) {
+            onCloseMobile();
+        }
+    }, [mobileOpen, onCloseMobile, toggleTheme]);
 
     return (
         <>
             {/* Mobile toggle */}
             <button
                 className="sidebar-mobile-toggle btn-icon"
-                onClick={() => setMobileOpen(!mobileOpen)}
+                onClick={onToggleMobile}
                 aria-label="Toggle sidebar"
+                aria-expanded={mobileOpen}
+                aria-controls="app-sidebar"
             >
                 {mobileOpen ? <HiOutlineXMark size={22} /> : <HiOutlineBars3 size={22} />}
             </button>
 
             {/* Overlay */}
             {mobileOpen && (
-                <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} />
+                <div className="sidebar-overlay" onClick={onCloseMobile} />
             )}
 
-            <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
+            <aside id="app-sidebar" className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
                 {/* Logo */}
                 <div className="sidebar-header">
                     <div className="sidebar-logo">
@@ -80,13 +123,15 @@ const Sidebar: React.FC = () => {
                         </div>
                         {!collapsed && <span className="sidebar-logo-text">SentimentAI</span>}
                     </div>
-                    <button
-                        className="sidebar-collapse-btn btn-icon"
-                        onClick={() => setCollapsed(!collapsed)}
-                        aria-label="Collapse sidebar"
-                    >
-                        <HiOutlineBars3 size={18} />
-                    </button>
+                    {!isMobile && (
+                        <button
+                            className="sidebar-collapse-btn btn-icon"
+                            onClick={onToggleCollapsed}
+                            aria-label="Collapse sidebar"
+                        >
+                            <HiOutlineBars3 size={18} />
+                        </button>
+                    )}
                 </div>
 
                 {/* Nav Links */}
@@ -99,7 +144,7 @@ const Sidebar: React.FC = () => {
                             key={link.to}
                             to={link.to}
                             className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-                            onClick={() => setMobileOpen(false)}
+                            onClick={handleNavClick}
                             title={link.label}
                         >
                             <span className="sidebar-link-icon">{link.icon}</span>
@@ -116,7 +161,7 @@ const Sidebar: React.FC = () => {
                                     key={link.to}
                                     to={link.to}
                                     className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-                                    onClick={() => setMobileOpen(false)}
+                                    onClick={handleNavClick}
                                     title={link.label}
                                 >
                                     <span className="sidebar-link-icon">{link.icon}</span>
@@ -129,7 +174,7 @@ const Sidebar: React.FC = () => {
 
                 {/* Footer */}
                 <div className="sidebar-footer">
-                    <button className="sidebar-link" onClick={toggleTheme} title="Toggle theme">
+                    <button className="sidebar-link" onClick={handleThemeToggle} title="Toggle theme">
                         <span className="sidebar-link-icon">
                             {isDark ? <HiOutlineSun /> : <HiOutlineMoon />}
                         </span>
@@ -143,11 +188,11 @@ const Sidebar: React.FC = () => {
                     {!collapsed && (
                         <div className="sidebar-user">
                             <div className="sidebar-user-avatar">
-                                {(user?.tk_email?.[0] || user?.tk_sdt?.[0] || 'U').toUpperCase()}
+                                {userInitial}
                             </div>
                             <div className="sidebar-user-info">
                                 <span className="sidebar-user-name truncate">
-                                    {user?.tk_email || user?.tk_sdt || 'User'}
+                                    {userDisplay}
                                 </span>
                                 <span className="sidebar-user-role">
                                     {role === 'admin' ? 'Admin' : 'User'}
@@ -190,4 +235,4 @@ const Sidebar: React.FC = () => {
     );
 };
 
-export default Sidebar;
+export default memo(Sidebar);

@@ -325,6 +325,19 @@
 }
 
 @media (max-width: 768px) {
+    .dashboard-header h1 {
+        font-size: var(--text-2xl);
+        align-items: flex-start;
+    }
+
+    .dashboard-stat-card,
+    .dashboard-sentiment,
+    .dashboard-trend,
+    .dashboard-area-chart,
+    .dashboard-batch-section {
+        padding: var(--space-5);
+    }
+
     .dashboard-row {
         grid-template-columns: 1fr;
     }
@@ -333,5 +346,19 @@
     .dashboard-batch-controls {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .dashboard-batch-controls .btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-stat-value {
+        font-size: var(--text-xl);
+    }
+
+    .dashboard-stat-card {
+        gap: var(--space-3);
     }
 }

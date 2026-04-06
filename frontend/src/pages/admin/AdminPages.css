@@ -1273,4 +1273,35 @@ html.performance-lite .users-table tbody tr {
     .texts-page .users-table thead th:nth-child(6) { width: 130px; }
 }
 
+@media (max-width: 640px) {
+    .admin-page-header h1 {
+        font-size: var(--text-2xl);
+        align-items: flex-start;
+        gap: var(--space-2);
+    }
+
+    .admin-page-header p {
+        font-size: var(--text-sm);
+    }
+
+    .admin-info-card,
+    .model-selector,
+    .test-input-card,
+    .model-details,
+    .model-compare,
+    .export-action-card {
+        padding: var(--space-5);
+    }
+
+    .users-toolbar {
+        padding: var(--space-3);
+    }
+
+    .confirm-dialog {
+        min-width: 0;
+        width: 94%;
+        padding: var(--space-6);
+    }
+}
+
 
