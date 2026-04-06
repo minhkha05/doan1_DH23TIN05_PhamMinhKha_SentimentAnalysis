@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { HiOutlineEnvelope, HiOutlineLockClosed, HiOutlineEye, HiOutlineEyeSlash, HiOutlineArrowLeft } from 'react-icons/hi2';
 import { useAuth } from '../../contexts/AuthContext';
+import { getApiBaseUrl } from '../../services/api';
 import { authService } from '../../services/authService';
 import toast from 'react-hot-toast';
 import logoImg from '../../assets/logo sentiment.png';
@@ -29,7 +30,13 @@ const LoginPage: React.FC = () => {
     }, []);
 
     const handleGoogleLogin = () => {
-        window.location.href = 'http://localhost:8000/api/v1/auth/google/login';
+        const apiBaseUrl = getApiBaseUrl();
+        if (!apiBaseUrl) {
+            toast.error('Thiếu cấu hình API. Vui lòng kiểm tra VITE_API_BASE_URL trên server.');
+            return;
+        }
+        const base = apiBaseUrl.replace(/\/$/, '');
+        window.location.href = `${base}/api/v1/auth/google/login`;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
