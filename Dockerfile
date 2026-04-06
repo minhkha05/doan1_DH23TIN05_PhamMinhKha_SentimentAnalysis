@@ -35,4 +35,4 @@ COPY --chown=user models/ $HOME/app/models/
 EXPOSE 7860
 
 # Khởi chạy Backend FastAPI thông qua Gunicorn (để chịu tải Production cực tốt)
-CMD ["gunicorn", "app.main:app", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:7860"]
+CMD ["gunicorn", "app.main:app", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:7860", "--timeout", "120", "--graceful-timeout", "30", "--keep-alive", "10"]

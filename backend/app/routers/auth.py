@@ -3,6 +3,7 @@ Auth router – /api/v1/auth
 Endpoints: register, login, profile, forgot-password, verify-reset-code, reset-password
 """
 
+import logging
 from urllib.parse import urlencode
 
 import httpx
@@ -29,6 +30,33 @@ from app.schemas.schemas import (
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
+logger = logging.getLogger(__name__)
+
+
+def _is_local_host(host: str) -> bool:
+    host = host.lower()
+    return host.startswith("localhost") or host.startswith("127.0.0.1")
+
+
+def _resolve_google_redirect_uri(settings, request: Request) -> str:
+    configured = (settings.GOOGLE_REDIRECT_URI or "").strip()
+    req_host = (request.headers.get("x-forwarded-host") or request.url.netloc or "").strip()
+    req_scheme = (request.headers.get("x-forwarded-proto") or request.url.scheme or "https").strip()
+    runtime_redirect = f"{req_scheme}://{req_host}/api/v1/auth/google/callback"
+    configured_host = (httpx.URL(configured).host or "") if configured else ""
+
+    if not configured:
+        logger.warning("GOOGLE_REDIRECT_URI not set, using runtime redirect URI: %s", runtime_redirect)
+        return runtime_redirect
+
+    if req_host and not _is_local_host(req_host) and _is_local_host(configured_host):
+        logger.warning(
+            "GOOGLE_REDIRECT_URI points to localhost while running on host=%s; using runtime redirect URI.",
+            req_host,
+        )
+        return runtime_redirect
+
+    return configured
 
 
 # ══════════════════════════════════════════════════════════
@@ -200,14 +228,16 @@ async def reset_password(
     summary="Đăng nhập bằng Google",
     description="Redirect đến Google OAuth để đăng nhập.",
 )
-async def google_login():
+async def google_login(request: Request):
     settings = get_settings()
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise HTTPException(status_code=500, detail="Google OAuth chưa được cấu hình trên server.")
 
+    redirect_uri = _resolve_google_redirect_uri(settings, request)
+
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
-        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+        "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "online",
@@ -231,34 +261,48 @@ async def google_callback(
     db: AsyncSession = Depends(get_db),
 ):
     settings = get_settings()
+    redirect_uri = _resolve_google_redirect_uri(settings, request)
     code = request.query_params.get("code")
     if not code:
         error = request.query_params.get("error", "unknown_error")
         raise HTTPException(status_code=400, detail=f"Google OAuth error: {error}")
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        token_resp = await client.post(
-            "https://oauth2.googleapis.com/token",
-            data={
-                "code": code,
-                "client_id": settings.GOOGLE_CLIENT_ID,
-                "client_secret": settings.GOOGLE_CLIENT_SECRET,
-                "redirect_uri": settings.GOOGLE_REDIRECT_URI,
-                "grant_type": "authorization_code",
-            },
-        )
+    timeout = httpx.Timeout(connect=8.0, read=12.0, write=12.0, pool=8.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        try:
+            token_resp = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                },
+            )
+        except httpx.HTTPError as exc:
+            logger.error("Google token request failed: %s", exc)
+            raise HTTPException(status_code=502, detail="Không thể kết nối Google OAuth.") from exc
+
         if token_resp.status_code != 200:
+            logger.error("Google token exchange failed: status=%s body=%s", token_resp.status_code, token_resp.text)
             raise HTTPException(status_code=400, detail="Không thể lấy access token từ Google.")
 
         access_token = token_resp.json().get("access_token")
         if not access_token:
             raise HTTPException(status_code=400, detail="Google không trả về access token hợp lệ.")
 
-        userinfo_resp = await client.get(
-            "https://www.googleapis.com/oauth2/v2/userinfo",
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
+        try:
+            userinfo_resp = await client.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+        except httpx.HTTPError as exc:
+            logger.error("Google userinfo request failed: %s", exc)
+            raise HTTPException(status_code=502, detail="Không thể lấy thông tin người dùng từ Google.") from exc
+
         if userinfo_resp.status_code != 200:
+            logger.error("Google userinfo failed: status=%s body=%s", userinfo_resp.status_code, userinfo_resp.text)
             raise HTTPException(status_code=400, detail="Không thể lấy thông tin người dùng từ Google.")
 
         user_info = userinfo_resp.json()

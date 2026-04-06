@@ -3,8 +3,11 @@ Email service – sends verification codes for password reset.
 Uses SMTP (Gmail App Password recommended).
 """
 
+import asyncio
+import logging
 import random
 import string
+import ssl
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Tuple
 
@@ -13,6 +16,9 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 from app.core.config import get_settings
+
+
+logger = logging.getLogger(__name__)
 
 # ── In-memory code store (production: use Redis/database) ──
 # Key: email, Value: (code, expiry_datetime)
@@ -46,6 +52,24 @@ def verify_code(email: str, code: str) -> bool:
 def consume_code(email: str):
     """Remove code after successful password reset."""
     _reset_codes.pop(email.lower(), None)
+
+
+def _send_email_sync(
+    smtp_host: str,
+    smtp_port: int,
+    smtp_user: str,
+    smtp_password: str,
+    to_email: str,
+    msg: MIMEMultipart,
+):
+    """Blocking SMTP send operation executed in a worker thread."""
+    tls_context = ssl.create_default_context()
+    with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+        server.ehlo()
+        server.starttls(context=tls_context)
+        server.ehlo()
+        server.login(smtp_user, smtp_password)
+        server.sendmail(smtp_user, to_email, msg.as_string())
 
 
 async def send_reset_email(to_email: str, code: str):
@@ -100,13 +124,20 @@ async def send_reset_email(to_email: str, code: str):
     msg.attach(MIMEText(html, "html"))
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_user, to_email, msg.as_string())
+        await asyncio.wait_for(
+            asyncio.to_thread(
+                _send_email_sync,
+                smtp_host,
+                smtp_port,
+                smtp_user,
+                smtp_password,
+                to_email,
+                msg,
+            ),
+            timeout=20,
+        )
+        logger.info("Password reset email sent successfully to %s", to_email)
     except Exception as e:
-        print(f"❌ Email send failed: {e}")
+        logger.error("Email send failed for %s: %s", to_email, e)
         # Still print code to console as fallback
         print(f"📧 RESET CODE for {to_email}: {code}")
