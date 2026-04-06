@@ -10,7 +10,18 @@ const isBrowser = typeof window !== 'undefined';
 const isLocalRuntime =
     isBrowser && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
-const API_BASE_URL = rawApiBaseUrl || (isLocalRuntime ? 'http://localhost:8000' : '');
+const isLocalAddress = (value: string): boolean =>
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(value);
+
+let resolvedApiBaseUrl = rawApiBaseUrl;
+if (!isLocalRuntime && resolvedApiBaseUrl && isLocalAddress(resolvedApiBaseUrl)) {
+    console.error(
+        'VITE_API_BASE_URL points to localhost in non-local runtime. Ignoring this value to avoid broken OAuth/API redirects.',
+    );
+    resolvedApiBaseUrl = '';
+}
+
+const API_BASE_URL = resolvedApiBaseUrl || (isLocalRuntime ? 'http://localhost:8000' : '');
 
 if (!API_BASE_URL) {
     console.error(
