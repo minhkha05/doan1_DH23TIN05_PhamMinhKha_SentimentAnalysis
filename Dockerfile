@@ -7,6 +7,8 @@ WORKDIR /app
 # Khắc phục lỗi cài đặt thư viện một số hệ thống
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    ca-certificates \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Cài đặt file requirements của Backend

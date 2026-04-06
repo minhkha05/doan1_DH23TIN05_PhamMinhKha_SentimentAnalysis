@@ -6,6 +6,7 @@ Loads environment variables from .env file.
 import logging
 import re
 from functools import lru_cache
+from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import field_validator
@@ -61,6 +62,8 @@ def _sanitize_and_validate_database_url(raw_value: object) -> str:
 class Settings(BaseSettings):
     # ── Database ──────────────────────────────────────────
     DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/sentiment_db"
+    DB_SSL_MODE: Literal["auto", "disable", "require", "verify-full"] = "auto"
+    DB_SSL_CA_FILE: str = ""
 
     # ── JWT Authentication ────────────────────────────────
     SECRET_KEY: str = "your-super-secret-key-change-in-production"
@@ -89,6 +92,16 @@ class Settings(BaseSettings):
     @classmethod
     def sanitize_database_url(cls, value: object) -> str:
         return _sanitize_and_validate_database_url(value)
+
+    @field_validator("DB_SSL_MODE", mode="before")
+    @classmethod
+    def normalize_db_ssl_mode(cls, value: object) -> str:
+        return str(value).strip().lower()
+
+    @field_validator("DB_SSL_CA_FILE", mode="before")
+    @classmethod
+    def normalize_db_ssl_ca_file(cls, value: object) -> str:
+        return str(value).strip().strip('"').strip("'")
 
     model_config = {
         "env_file": ".env",

@@ -5,10 +5,23 @@
 import axios from 'axios';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+const isBrowser = typeof window !== 'undefined';
+const isLocalRuntime =
+    isBrowser && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+const API_BASE_URL = rawApiBaseUrl || (isLocalRuntime ? 'http://localhost:8000' : '');
+
+if (!API_BASE_URL) {
+    console.error(
+        'Missing VITE_API_BASE_URL for non-local runtime. Configure it in your deployment environment.',
+    );
+}
+
+export const getApiBaseUrl = (): string => API_BASE_URL;
 
 const api = axios.create({
-    baseURL: API_BASE_URL,
+    baseURL: API_BASE_URL || undefined,
     headers: { 'Content-Type': 'application/json' },
     timeout: 30000,
 });
