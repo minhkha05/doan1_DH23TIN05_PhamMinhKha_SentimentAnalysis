@@ -65,6 +65,13 @@ export interface ModelInfo {
     val_samples?: number;
 }
 
+export interface TestModelResult {
+    camxuc: CamXuc;
+    tincay: number;
+    noidung: string;
+    model: string;
+}
+
 export const adminService = {
     getDashboard: async (): Promise<DashboardStats> => {
         const res = await api.get(`${ADMIN_PREFIX}/dashboard`);
@@ -78,17 +85,17 @@ export const adminService = {
         search?: string;
         role?: string;
         status?: string;
-    }): Promise<PaginatedResponse<AdminUserItem>> => {
-        const res = await api.get(`${ADMIN_PREFIX}/users`, { params });
+    }, signal?: AbortSignal): Promise<PaginatedResponse<AdminUserItem>> => {
+        const res = await api.get(`${ADMIN_PREFIX}/users`, { params, signal });
         return res.data;
     },
 
-    updateUserRole: async (userId: number, vaitro: string): Promise<any> => {
+    updateUserRole: async (userId: number, vaitro: string): Promise<SuccessResponse> => {
         const res = await api.put(`${ADMIN_PREFIX}/users/${userId}/role`, { vaitro });
         return res.data;
     },
 
-    updateUserStatus: async (userId: number, xoa: boolean): Promise<any> => {
+    updateUserStatus: async (userId: number, xoa: boolean): Promise<SuccessResponse> => {
         const res = await api.put(`${ADMIN_PREFIX}/users/${userId}/status`, { xoa });
         return res.data;
     },
@@ -169,8 +176,8 @@ export const adminService = {
         end_date?: string;
         sentiment?: CamXuc;
         model_ai?: string;
-    }): Promise<PaginatedResponse<ExportPreviewItem>> => {
-        const res = await api.get(`${ADMIN_PREFIX}/export/preview`, { params });
+    }, signal?: AbortSignal): Promise<PaginatedResponse<ExportPreviewItem>> => {
+        const res = await api.get(`${ADMIN_PREFIX}/export/preview`, { params, signal });
         return res.data;
     },
 
@@ -190,7 +197,7 @@ export const adminService = {
         return res.data;
     },
 
-    testModel: async (noidung: string, model_name: string): Promise<any> => {
+    testModel: async (noidung: string, model_name: string): Promise<TestModelResult> => {
         const res = await api.post(`${ADMIN_PREFIX}/models/test`, { noidung, model_name });
         return res.data;
     },
@@ -205,7 +212,7 @@ export const adminService = {
         return res.data;
     },
 
-    setActiveModel: async (model_name: string): Promise<any> => {
+    setActiveModel: async (model_name: string): Promise<SuccessResponse> => {
         const res = await api.put(`${ADMIN_PREFIX}/models/active`, { model_name });
         return res.data;
     },
@@ -215,8 +222,8 @@ export const adminService = {
         page?: number;
         page_size?: number;
         search?: string;
-    }): Promise<PaginatedResponse<AdminTextItem>> => {
-        const res = await api.get(`${ADMIN_PREFIX}/texts`, { params });
+    }, signal?: AbortSignal): Promise<PaginatedResponse<AdminTextItem>> => {
+        const res = await api.get(`${ADMIN_PREFIX}/texts`, { params, signal });
         return res.data;
     },
 

@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Cài đặt file requirements của Backend
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install pydantic-settings gunicorn
+    && pip install gunicorn
 
 # YÊU CẦU BẮT BUỘC CỦA HUGGING FACE SPACES: Chạy bằng User cấp thấp (ID: 1000)
 # Không được phép chạy bằng tài khoản Root để đảm bảo bảo mật.

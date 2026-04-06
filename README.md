@@ -4,7 +4,7 @@ Dự án phân tích cảm xúc tiếng Việt theo 3 nhãn: **Tiêu cực**, **
 
 ## 🛠️ Công Nghệ Sử Dụng
 - **Backend**: FastAPI, PostgreSQL, SQLAlchemy, JWT.
-- **Frontend**: React, TypeScript, Vite, Tailwind CSS.
+- **Frontend**: React, TypeScript, Vite.
 - **AI (Deep Learning)**: PhoBERT (Transformers, PyTorch).
 - **AI (Traditional ML)**: TF-IDF + LinearSVC + CalibratedClassifierCV.
 

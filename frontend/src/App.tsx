@@ -76,9 +76,20 @@ const OAuthQueryBridge: React.FC = () => {
 
 const App: React.FC = () => {
   useEffect(() => {
+    const nav = navigator as Navigator & {
+      connection?: {
+        saveData?: boolean;
+        effectiveType?: string;
+      };
+    };
+
     const isPerformanceLite = document.documentElement.classList.contains('performance-lite');
     const isMobileViewport = window.matchMedia('(max-width: 900px)').matches;
-    if (isPerformanceLite || isMobileViewport) {
+    const isConstrainedNetwork =
+      !!nav.connection?.saveData ||
+      ['slow-2g', '2g'].includes(nav.connection?.effectiveType || '');
+
+    if (isPerformanceLite || isMobileViewport || isConstrainedNetwork) {
       return;
     }
 
@@ -90,7 +101,8 @@ const App: React.FC = () => {
 
     try {
       const rawUser = localStorage.getItem('user');
-      const storedRole = rawUser ? JSON.parse(rawUser)?.vaitro : undefined;
+      const roleFromUser = rawUser ? JSON.parse(rawUser)?.vaitro : undefined;
+      const storedRole = roleFromUser || localStorage.getItem('user_role');
       if (storedRole === 'admin') {
         preloaders.push(
           () => import('./pages/admin/DashboardPage'),

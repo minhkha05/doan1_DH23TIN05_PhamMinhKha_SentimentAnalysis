@@ -3,7 +3,16 @@
    Features: list, search, paginate, delete (soft)
    ═══════════════════════════════════════════════════ */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {
+    Profiler,
+    memo,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
+import type { ProfilerOnRenderCallback } from 'react';
 import {
     HiOutlineDocumentText,
     HiOutlineMagnifyingGlass,
@@ -18,10 +27,14 @@ import {
 } from 'react-icons/hi2';
 import { adminService } from '../../services/adminService';
 import type { AdminTextItem, CamXuc } from '../../types';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useTableVirtualizer } from '../../hooks/useTableVirtualizer';
 import toast from 'react-hot-toast';
 import './AdminPages.css';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 120;
+const VIRTUAL_ROW_HEIGHT = 60;
+const VIRTUALIZATION_THRESHOLD = 35;
 
 const sentimentConfig: Record<CamXuc, { icon: React.ReactNode; label: string; class: string }> = {
     positive: { icon: <HiOutlineFaceSmile />, label: 'Tích cực', class: 'positive' },
@@ -29,7 +42,90 @@ const sentimentConfig: Record<CamXuc, { icon: React.ReactNode; label: string; cl
     neutral: { icon: <HiOutlineMinusCircle />, label: 'Trung tính', class: 'neutral' },
 };
 
+const TEXTS_TABLE_PROFILER: ProfilerOnRenderCallback = (
+    id,
+    phase,
+    actualDuration,
+) => {
+    if (!import.meta.env.DEV) return;
+    if (actualDuration < 8) return;
+    console.info(`[Profiler:${id}] ${phase} commit: ${actualDuration.toFixed(2)}ms`);
+};
+
+const isAbortError = (error: unknown): boolean => {
+    if (!error || typeof error !== 'object') return false;
+    const maybeAxios = error as { code?: string; name?: string };
+    return maybeAxios.code === 'ERR_CANCELED' || maybeAxios.name === 'CanceledError';
+};
+
+const getApiErrorDetail = (error: unknown): string | undefined => {
+    if (!error || typeof error !== 'object') return undefined;
+    const maybeAxios = error as { response?: { data?: { detail?: string } } };
+    return maybeAxios.response?.data?.detail;
+};
+
+interface TextRowProps {
+    item: AdminTextItem;
+    onView: (text: string) => void;
+    onDelete: (vbId: number) => void;
+    formatDate: (value: string | null) => string;
+}
+
+const TextRow = memo(({ item, onView, onDelete, formatDate }: TextRowProps) => {
+    const config = item.camxuc_ai ? sentimentConfig[item.camxuc_ai] : null;
+
+    return (
+        <tr>
+            <td className="admin-td-id">#{item.vb_id}</td>
+            <td>
+                <span style={{ fontSize: 'var(--text-sm)' }}>
+                    {item.user_email || item.user_sdt || '—'}
+                </span>
+            </td>
+            <td className="admin-td-text" title={item.noidung}>
+                {item.noidung}
+            </td>
+            <td>
+                {config ? (
+                    <span className={`badge badge-${config.class}`}>
+                        {config.icon} {config.label}
+                    </span>
+                ) : '—'}
+            </td>
+            <td className="admin-td-confidence">
+                {item.tincay != null ? `${(item.tincay * 100).toFixed(1)}%` : '—'}
+            </td>
+            <td className="admin-td-date">{formatDate(item.vb_taoluc)}</td>
+            <td>
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center', minHeight: '40px' }}>
+                    <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => onView(item.noidung)}
+                        title="Xem chi tiết"
+                    >
+                        <HiOutlineEye size={18} />
+                    </button>
+                    <button
+                        className="btn btn-ghost btn-sm btn-delete"
+                        style={{ color: 'var(--negative)' }}
+                        onClick={() => onDelete(item.vb_id)}
+                        title="Xóa văn bản"
+                    >
+                        <HiOutlineTrash size={18} />
+                    </button>
+                </div>
+            </td>
+        </tr>
+    );
+});
+
+TextRow.displayName = 'TextRow';
+
 const TextsPage: React.FC = () => {
+    const cacheRef = useRef(new Map<string, { items: AdminTextItem[]; total: number; total_pages: number }>());
+    const activeRequestRef = useRef<AbortController | null>(null);
+    const tableContainerRef = useRef<HTMLDivElement | null>(null);
+
     const [items, setItems] = useState<AdminTextItem[]>([]);
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
@@ -37,59 +133,118 @@ const TextsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [searchInput, setSearchInput] = useState('');
     const [search, setSearch] = useState('');
+    const debouncedSearch = useDebouncedValue(searchInput.trim(), 260);
 
     // Confirm dialog
     const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
     // View dialog
     const [viewText, setViewText] = useState<string | null>(null);
 
-    const fetchTexts = useCallback(async () => {
+    useEffect(() => {
+        setSearch(debouncedSearch);
+    }, [debouncedSearch]);
+
+    const queryKey = useMemo(() => `${page}|${search}`, [page, search]);
+
+    const fetchTexts = useCallback(async (force = false) => {
+        const cached = cacheRef.current.get(queryKey);
+        if (!force && cached) {
+            setItems(cached.items);
+            setTotal(cached.total);
+            setTotalPages(cached.total_pages);
+            setLoading(false);
+            return;
+        }
+
+        activeRequestRef.current?.abort();
+        const controller = new AbortController();
+        activeRequestRef.current = controller;
+
         setLoading(true);
         try {
-            const params: any = { page, page_size: PAGE_SIZE };
+            const params: { page: number; page_size: number; search?: string } = {
+                page,
+                page_size: PAGE_SIZE,
+            };
             if (search.trim()) params.search = search.trim();
-            const res = await adminService.getTexts(params);
+
+            const res = await adminService.getTexts(params, controller.signal);
+            if (controller.signal.aborted) return;
+
+            cacheRef.current.set(queryKey, {
+                items: res.items,
+                total: res.total,
+                total_pages: res.total_pages,
+            });
+
             setItems(res.items);
             setTotal(res.total);
             setTotalPages(res.total_pages);
-        } catch {
+        } catch (error) {
+            if (isAbortError(error)) return;
             toast.error('Không thể tải danh sách văn bản.');
         } finally {
-            setLoading(false);
+            if (activeRequestRef.current === controller) {
+                setLoading(false);
+            }
         }
-    }, [page, search]);
+    }, [page, queryKey, search]);
 
     useEffect(() => {
-        fetchTexts();
+        void fetchTexts();
+        return () => {
+            activeRequestRef.current?.abort();
+        };
     }, [fetchTexts]);
-
-    // Debounced search
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setSearch(searchInput);
-            setPage(1);
-        }, 400);
-        return () => clearTimeout(timer);
-    }, [searchInput]);
 
     const handleDelete = async (vbId: number) => {
         try {
             await adminService.deleteText(vbId);
             toast.success('Đã xóa văn bản.');
             setConfirmDeleteId(null);
-            fetchTexts();
-        } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Lỗi khi xóa văn bản.');
+            cacheRef.current.clear();
+            await fetchTexts(true);
+        } catch (err: unknown) {
+            toast.error(getApiErrorDetail(err) || 'Lỗi khi xóa văn bản.');
         }
     };
 
-    const formatDate = (d: string | null) => {
+    const formatDate = useCallback((d: string | null) => {
         if (!d) return '—';
         return new Date(d).toLocaleDateString('vi-VN', {
             day: '2-digit', month: '2-digit', year: 'numeric',
             hour: '2-digit', minute: '2-digit',
         });
-    };
+    }, []);
+
+    const handleResetSearch = useCallback(() => {
+        setSearchInput('');
+        setPage(1);
+    }, []);
+
+    const virtualizer = useTableVirtualizer({
+        containerRef: tableContainerRef,
+        itemCount: items.length,
+        rowHeight: VIRTUAL_ROW_HEIGHT,
+        overscan: 8,
+        enabled: items.length >= VIRTUALIZATION_THRESHOLD,
+    });
+
+    const renderedItems = useMemo(
+        () => (virtualizer.enabled ? items.slice(virtualizer.startIndex, virtualizer.endIndex) : items),
+        [items, virtualizer.enabled, virtualizer.endIndex, virtualizer.startIndex],
+    );
+
+    const paginationNumbers = useMemo(() => {
+        const maxButtons = 7;
+        const length = Math.min(totalPages, maxButtons);
+        return Array.from({ length }, (_, i) => {
+            if (totalPages <= maxButtons) return i + 1;
+            if (page <= 4) return i + 1;
+            if (page >= totalPages - 3) return totalPages - 6 + i;
+            return page - 3 + i;
+        });
+    }, [page, totalPages]);
 
     return (
         <div className="admin-page texts-page">
@@ -107,13 +262,16 @@ const TextsPage: React.FC = () => {
                         className="input users-search-input"
                         placeholder="Tìm theo nội dung văn bản..."
                         value={searchInput}
-                        onChange={(e) => setSearchInput(e.target.value)}
+                        onChange={(e) => {
+                            setSearchInput(e.target.value);
+                            setPage(1);
+                        }}
                     />
                 </div>
                 <div className="users-filters">
                     <button
                         className="btn btn-ghost btn-sm"
-                        onClick={() => { setSearchInput(''); setPage(1); }}
+                        onClick={handleResetSearch}
                     >
                         <HiOutlineArrowPath size={14} /> Reset
                     </button>
@@ -130,68 +288,84 @@ const TextsPage: React.FC = () => {
                         <p>Không tìm thấy văn bản nào.</p>
                     </div>
                 ) : (
-                    <div className="users-table-container">
-                        <table className="table users-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Người dùng</th>
-                                    <th>Nội dung</th>
-                                    <th>Kết quả AI</th>
-                                    <th>Độ tin cậy</th>
-                                    <th>Ngày tạo</th>
-                                    <th>Thao tác</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {items.map((item) => {
-                                    const config = item.camxuc_ai ? sentimentConfig[item.camxuc_ai] : null;
-                                    return (
-                                        <tr key={item.vb_id}>
-                                            <td className="admin-td-id">#{item.vb_id}</td>
-                                            <td>
-                                                <span style={{ fontSize: 'var(--text-sm)' }}>
-                                                    {item.user_email || item.user_sdt || '—'}
-                                                </span>
-                                            </td>
-                                            <td className="admin-td-text" title={item.noidung}>
-                                                {item.noidung}
-                                            </td>
-                                            <td>
-                                                {config ? (
-                                                    <span className={`badge badge-${config.class}`}>
-                                                        {config.icon} {config.label}
-                                                    </span>
-                                                ) : '—'}
-                                            </td>
-                                            <td className="admin-td-confidence">
-                                                {item.tincay != null
-                                                    ? `${(item.tincay * 100).toFixed(1)}%`
-                                                    : '—'}
-                                            </td>
-                                            <td className="admin-td-date">{formatDate(item.vb_taoluc)}</td>
-                                            <td>
-                                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center', minHeight: '40px' }}>
-                                                    <button
-                                                        className="btn btn-ghost btn-sm"
-                                                        onClick={() => setViewText(item.noidung)}
-                                                        title="Xem chi tiết"
-                                                    >
-                                                        <HiOutlineEye size={18}  />
-                                                    </button>
-                                                    <button
-                                                        className="btn btn-ghost btn-sm btn-delete" style={{ color: 'var(--negative)' }} onClick={() => setConfirmDeleteId(item.vb_id)}
-                                                        title="Xóa văn bản"
-                                                    >
-                                                        <HiOutlineTrash size={18}  />
-                                                    </button>
-                                                </div>
-                                            </td>
+                    <div ref={tableContainerRef} className="users-table-container users-table-virtual-scroll">
+                        {import.meta.env.DEV ? (
+                            <Profiler id="AdminTextsTable" onRender={TEXTS_TABLE_PROFILER}>
+                                <table className="table users-table users-table-virtualized">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Người dùng</th>
+                                            <th>Nội dung</th>
+                                            <th>Kết quả AI</th>
+                                            <th>Độ tin cậy</th>
+                                            <th>Ngày tạo</th>
+                                            <th>Thao tác</th>
                                         </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                                    </thead>
+                                    <tbody>
+                                        {virtualizer.enabled && virtualizer.paddingTop > 0 && (
+                                            <tr className="virtual-spacer-row" aria-hidden="true">
+                                                <td colSpan={7} style={{ height: `${virtualizer.paddingTop}px` }} />
+                                            </tr>
+                                        )}
+
+                                        {renderedItems.map((item) => (
+                                            <TextRow
+                                                key={item.vb_id}
+                                                item={item}
+                                                onView={setViewText}
+                                                onDelete={setConfirmDeleteId}
+                                                formatDate={formatDate}
+                                            />
+                                        ))}
+
+                                        {virtualizer.enabled && virtualizer.paddingBottom > 0 && (
+                                            <tr className="virtual-spacer-row" aria-hidden="true">
+                                                <td colSpan={7} style={{ height: `${virtualizer.paddingBottom}px` }} />
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </Profiler>
+                        ) : (
+                            <table className="table users-table users-table-virtualized">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Người dùng</th>
+                                        <th>Nội dung</th>
+                                        <th>Kết quả AI</th>
+                                        <th>Độ tin cậy</th>
+                                        <th>Ngày tạo</th>
+                                        <th>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {virtualizer.enabled && virtualizer.paddingTop > 0 && (
+                                        <tr className="virtual-spacer-row" aria-hidden="true">
+                                            <td colSpan={7} style={{ height: `${virtualizer.paddingTop}px` }} />
+                                        </tr>
+                                    )}
+
+                                    {renderedItems.map((item) => (
+                                        <TextRow
+                                            key={item.vb_id}
+                                            item={item}
+                                            onView={setViewText}
+                                            onDelete={setConfirmDeleteId}
+                                            formatDate={formatDate}
+                                        />
+                                    ))}
+
+                                    {virtualizer.enabled && virtualizer.paddingBottom > 0 && (
+                                        <tr className="virtual-spacer-row" aria-hidden="true">
+                                            <td colSpan={7} style={{ height: `${virtualizer.paddingBottom}px` }} />
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 )}
             </div>
@@ -206,27 +380,15 @@ const TextsPage: React.FC = () => {
                     >
                         <HiOutlineChevronLeft />
                     </button>
-                    {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                        let pageNum: number;
-                        if (totalPages <= 7) {
-                            pageNum = i + 1;
-                        } else if (page <= 4) {
-                            pageNum = i + 1;
-                        } else if (page >= totalPages - 3) {
-                            pageNum = totalPages - 6 + i;
-                        } else {
-                            pageNum = page - 3 + i;
-                        }
-                        return (
-                            <button
-                                key={pageNum}
-                                className={`pagination-btn ${page === pageNum ? 'active' : ''}`}
-                                onClick={() => setPage(pageNum)}
-                            >
-                                {pageNum}
-                            </button>
-                        );
-                    })}
+                    {paginationNumbers.map((pageNum) => (
+                        <button
+                            key={pageNum}
+                            className={`pagination-btn ${page === pageNum ? 'active' : ''}`}
+                            onClick={() => setPage(pageNum)}
+                        >
+                            {pageNum}
+                        </button>
+                    ))}
                     <button
                         className="pagination-btn"
                         onClick={() => setPage((p) => Math.min(totalPages, p + 1))}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     HiOutlineArrowDownTray,
     HiOutlineCalendarDays,
@@ -19,7 +19,16 @@ import './AdminPages.css';
 
 const PREVIEW_PAGE_SIZE = 10;
 
+const isAbortError = (error: unknown): boolean => {
+    if (!error || typeof error !== 'object') return false;
+    const maybeAxios = error as { code?: string; name?: string };
+    return maybeAxios.code === 'ERR_CANCELED' || maybeAxios.name === 'CanceledError';
+};
+
 const ExportPage: React.FC = () => {
+    const previewCacheRef = useRef(new Map<string, { items: ExportPreviewItem[]; total: number }>());
+    const activePreviewRequestRef = useRef<AbortController | null>(null);
+
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [sentiment, setSentiment] = useState('');
@@ -33,16 +42,39 @@ const ExportPage: React.FC = () => {
 
     const [lastExport, setLastExport] = useState<ExportDownloadMeta | null>(null);
 
-    const validateDateRange = () => {
+    useEffect(() => {
+        return () => {
+            activePreviewRequestRef.current?.abort();
+        };
+    }, []);
+
+    const validateDateRange = useCallback(() => {
         if (startDate && endDate && startDate > endDate) {
             toast.error('Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.');
             return false;
         }
         return true;
-    };
+    }, [endDate, startDate]);
 
-    const handleFilter = async (page = 1) => {
+    const buildPreviewCacheKey = useCallback((page: number) => {
+        return `${page}|${startDate}|${endDate}|${sentiment}`;
+    }, [endDate, sentiment, startDate]);
+
+    const handleFilter = useCallback(async (page = 1) => {
         if (!validateDateRange()) return;
+
+        const cacheKey = buildPreviewCacheKey(page);
+        const cached = previewCacheRef.current.get(cacheKey);
+        if (cached) {
+            setPreviewItems(cached.items);
+            setPreviewTotal(cached.total);
+            setPreviewPage(page);
+            return;
+        }
+
+        activePreviewRequestRef.current?.abort();
+        const controller = new AbortController();
+        activePreviewRequestRef.current = controller;
 
         setPreviewLoading(true);
         try {
@@ -52,20 +84,31 @@ const ExportPage: React.FC = () => {
                 start_date: startDate || undefined,
                 end_date: endDate || undefined,
                 sentiment: (sentiment || undefined) as CamXuc | undefined,
+            }, controller.signal);
+
+            if (controller.signal.aborted) return;
+
+            previewCacheRef.current.set(cacheKey, {
+                items: res.items,
+                total: res.total,
             });
+
             setPreviewItems(res.items);
             setPreviewTotal(res.total);
             setPreviewPage(page);
             toast.success(`Đã lọc ${res.total} dòng dữ liệu.`);
         } catch (err: unknown) {
+            if (isAbortError(err)) return;
             const error = err as AxiosError<{ detail?: string }>;
             toast.error(error.response?.data?.detail || 'Không lọc được dữ liệu preview.');
         } finally {
-            setPreviewLoading(false);
+            if (activePreviewRequestRef.current === controller) {
+                setPreviewLoading(false);
+            }
         }
-    };
+    }, [buildPreviewCacheKey, endDate, sentiment, startDate, validateDateRange]);
 
-    const handleExport = async () => {
+    const handleExport = useCallback(async () => {
         if (!validateDateRange()) return;
 
         setExportLoading(true);
@@ -95,9 +138,12 @@ const ExportPage: React.FC = () => {
         } finally {
             setExportLoading(false);
         }
-    };
+    }, [endDate, fileFormat, sentiment, startDate, validateDateRange]);
 
-    const previewTotalPages = Math.max(1, Math.ceil(previewTotal / PREVIEW_PAGE_SIZE));
+    const previewTotalPages = useMemo(
+        () => Math.max(1, Math.ceil(previewTotal / PREVIEW_PAGE_SIZE)),
+        [previewTotal],
+    );
 
     return (
         <div className="admin-page">

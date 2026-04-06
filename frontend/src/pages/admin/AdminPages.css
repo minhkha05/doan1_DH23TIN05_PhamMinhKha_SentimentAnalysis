@@ -796,9 +796,40 @@
 
 /* ── Table ──────────────────────────────────────── */
 .users-table-container {
-    overflow-x: auto;
+    overflow: auto;
     min-height: 400px;
     contain: layout paint;
+    -webkit-overflow-scrolling: touch;
+}
+
+.users-table-virtual-scroll {
+    max-height: min(68vh, 780px);
+}
+
+.users-table-virtualized {
+    --virtual-row-height: 62px;
+}
+
+.users-table-virtualized thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg-surface);
+}
+
+.users-table-virtualized tbody tr {
+    height: var(--virtual-row-height);
+}
+
+.texts-page .users-table-virtualized {
+    --virtual-row-height: 60px;
+}
+
+.virtual-spacer-row td {
+    padding: 0 !important;
+    border: 0 !important;
+    line-height: 0;
+    background: transparent;
 }
 
 .users-table {
@@ -1141,6 +1172,10 @@ html.performance-lite .users-table tbody tr {
 
     .users-table {
         min-width: 1000px;
+    }
+
+    .users-table-virtual-scroll {
+        max-height: min(64vh, 640px);
     }
 
     .users-actions {
